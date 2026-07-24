@@ -4,4 +4,7 @@
 # Extracted APK/OBB analysis material
 /analysis/apk-small/
 /analysis/python-packages/
-
+/analysis/gemrb-test/
+/analysis/gemrb-game/
+__pycache__/
+*.pyc

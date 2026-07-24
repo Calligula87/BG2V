@@ -179,3 +179,9 @@ should be conducted before selecting this route.
 - clean/legal input gate: **not yet satisfied**
 - overall: **GO to a bounded proof of concept; not yet a full-port commitment**
 
+## Follow-up decision
+
+The embedded OBB and complete manifest/DEX interface were subsequently
+inspected. The selected next route is a bounded direct Android ARMv7 wrapper
+proof of concept, with automatic pivot conditions to GemRB. See
+[`ROUTE_DECISION.md`](ROUTE_DECISION.md).

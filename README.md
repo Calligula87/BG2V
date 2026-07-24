@@ -8,7 +8,8 @@ OpenGL ES 2, and OpenAL. This makes an Android-native-library wrapper technicall
 plausible, subject to JNI, graphics, memory, and data-loading prototypes.
 
 See [`analysis/BG2_APK_FEASIBILITY.md`](analysis/BG2_APK_FEASIBILITY.md) for the
-current technical findings.
+initial findings and [`analysis/ROUTE_DECISION.md`](analysis/ROUTE_DECISION.md)
+for the wrapper-versus-GemRB decision.
 
 ## Legal and repository policy
 
@@ -21,8 +22,8 @@ from Git.
 
 ## Current status
 
-Preliminary feasibility: **go to a bounded proof of concept**.
+Selected route: **bounded direct Android ARMv7 wrapper proof of concept**, with
+GemRB retained as the fallback.
 
 Next target: load the ARMv7 engine far enough to reach `JNI_OnLoad` and the SDL
 native initialization entry point on Vita.
-
