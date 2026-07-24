@@ -133,6 +133,88 @@ static FILE __sF_fake[3];
 
 void *dlsym_soloader(void * handle, const char * symbol);
 
+/*
+ * Android/Bionic FORTIFY entry points. The final object-size argument is a
+ * runtime bounds check on Android; the Vita loader cannot reproduce Bionic's
+ * abort diagnostics, so these compatibility shims preserve the underlying C
+ * operation. Keep distinct names to avoid compiler built-in symbol handling.
+ */
+static size_t bg2v_strlen_chk(const char *s, size_t s_len) {
+    (void)s_len;
+    return strlen(s);
+}
+
+static void *bg2v_memcpy_chk(void *dst, const void *src, size_t count, size_t dst_len) {
+    (void)dst_len;
+    return memcpy(dst, src, count);
+}
+
+static void *bg2v_memmove_chk(void *dst, const void *src, size_t count, size_t dst_len) {
+    (void)dst_len;
+    return memmove(dst, src, count);
+}
+
+static void *bg2v_memset_chk(void *dst, int value, size_t count, size_t dst_len) {
+    (void)dst_len;
+    return memset(dst, value, count);
+}
+
+static char *bg2v_strchr_chk(const char *s, int c, size_t s_len) {
+    (void)s_len;
+    return strchr(s, c);
+}
+
+static char *bg2v_strrchr_chk(const char *s, int c, size_t s_len) {
+    (void)s_len;
+    return strrchr(s, c);
+}
+
+static char *bg2v_strcpy_chk(char *dst, const char *src, size_t dst_len) {
+    (void)dst_len;
+    return strcpy(dst, src);
+}
+
+static char *bg2v_strcat_chk(char *dst, const char *src, size_t dst_len) {
+    (void)dst_len;
+    return strcat(dst, src);
+}
+
+static char *bg2v_strncpy_chk(char *dst, const char *src, size_t count, size_t dst_len) {
+    (void)dst_len;
+    return strncpy(dst, src, count);
+}
+
+static char *bg2v_strncpy_chk2(char *dst, const char *src, size_t count,
+                              size_t dst_len, size_t src_len) {
+    (void)dst_len;
+    (void)src_len;
+    return strncpy(dst, src, count);
+}
+
+static char *bg2v_strncat_chk(char *dst, const char *src, size_t count, size_t dst_len) {
+    (void)dst_len;
+    return strncat(dst, src, count);
+}
+
+static ssize_t bg2v_read_chk(int fd, void *buf, size_t count, size_t buf_len) {
+    (void)buf_len;
+    return read(fd, buf, count);
+}
+
+static int bg2v_vsprintf_chk(char *dst, int flags, size_t dst_len,
+                            const char *format, va_list ap) {
+    (void)flags;
+    (void)dst_len;
+    return vsprintf(dst, format, ap);
+}
+
+static int bg2v_vsnprintf_chk(char *dst, size_t supplied_size, int flags,
+                             size_t dst_len, const char *format, va_list ap) {
+    (void)flags;
+    (void)dst_len;
+    return vsnprintf(dst, supplied_size, format, ap);
+}
+
 so_default_dynlib default_dynlib[] = {
         // Common C/C++ internals
         { "_ZNSt8bad_castD1Ev", (uintptr_t)&_ZNSt8bad_castD1Ev },
@@ -217,6 +299,20 @@ so_default_dynlib default_dynlib[] = {
         { "__swbuf", (uintptr_t)&__swbuf },
         { "__system_property_get", (uintptr_t)&__system_property_get_soloader },
         { "__assert2", (uintptr_t)&ret0 }, // TODO: stub/impl
+        { "__strlen_chk", (uintptr_t)&bg2v_strlen_chk },
+        { "__read_chk", (uintptr_t)&bg2v_read_chk },
+        { "__memcpy_chk", (uintptr_t)&bg2v_memcpy_chk },
+        { "__memmove_chk", (uintptr_t)&bg2v_memmove_chk },
+        { "__memset_chk", (uintptr_t)&bg2v_memset_chk },
+        { "__strchr_chk", (uintptr_t)&bg2v_strchr_chk },
+        { "__strrchr_chk", (uintptr_t)&bg2v_strrchr_chk },
+        { "__strcpy_chk", (uintptr_t)&bg2v_strcpy_chk },
+        { "__strcat_chk", (uintptr_t)&bg2v_strcat_chk },
+        { "__strncpy_chk", (uintptr_t)&bg2v_strncpy_chk },
+        { "__strncpy_chk2", (uintptr_t)&bg2v_strncpy_chk2 },
+        { "__strncat_chk", (uintptr_t)&bg2v_strncat_chk },
+        { "__vsprintf_chk", (uintptr_t)&bg2v_vsprintf_chk },
+        { "__vsnprintf_chk", (uintptr_t)&bg2v_vsnprintf_chk },
         { "dl_unwind_find_exidx", (uintptr_t)&ret0 }, // TODO: stub/impl
 
 
