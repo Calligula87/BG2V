@@ -9,7 +9,9 @@
 
 #include <psp2/kernel/clib.h>
 #include <psp2/kernel/threadmgr.h>
+#include <psp2/io/fcntl.h>
 
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdatomic.h>
 
@@ -29,6 +31,40 @@ static atomic_bool _log_mutex_ready = ATOMIC_VAR_INIT(false);
 static char buffer_a[2048];
 // Buffer B is used to compile the final log using the updated format string.
 static char buffer_b[2048];
+static char file_buffer[2048];
+
+#define BG2V_LOG_PATH DATA_PATH "bootstrap.log"
+
+void bg2v_log_reset(void) {
+    sceIoRemove(BG2V_LOG_PATH);
+    bg2v_log_printf("BG2V SDL bootstrap diagnostic log\n");
+}
+
+int bg2v_log_printf(const char *fmt, ...) {
+    va_list list;
+    va_start(list, fmt);
+    int length = sceClibVsnprintf(
+        file_buffer, sizeof(file_buffer), fmt, list);
+    va_end(list);
+
+    if (length < 0) {
+        return length;
+    }
+
+    size_t write_length = (size_t)length;
+    if (write_length >= sizeof(file_buffer)) {
+        write_length = sizeof(file_buffer) - 1;
+    }
+
+    sceClibPrintf("%s", file_buffer);
+    SceUID fd = sceIoOpen(
+        BG2V_LOG_PATH, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND, 0666);
+    if (fd >= 0) {
+        sceIoWrite(fd, file_buffer, write_length);
+        sceIoClose(fd);
+    }
+    return length;
+}
 
 void _log_print(int t, const char* fmt, ...) {
     if (!atomic_load_explicit(&_log_mutex_ready, memory_order_relaxed)) {
@@ -74,7 +110,7 @@ void _log_print(int t, const char* fmt, ...) {
     va_start(list, fmt);
     sceClibVsnprintf(buffer_b, sizeof(buffer_b), buffer_a, list);
     va_end(list);
-    sceClibPrintf(buffer_b);
+    bg2v_log_printf("%s", buffer_b);
 
     if (atomic_load_explicit(&_log_mutex_ready, memory_order_relaxed)) {
         sceKernelUnlockLwMutex(&_log_mutex, 1);

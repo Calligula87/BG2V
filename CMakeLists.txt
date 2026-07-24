@@ -129,6 +129,13 @@ endif()
 
 add_executable(${CMAKE_PROJECT_NAME} ${SOURCES})
 
+set_source_files_properties(
+    lib/falso_jni/FalsoJNI_Logger.c
+    PROPERTIES
+    COMPILE_OPTIONS
+    "-include;${CMAKE_SOURCE_DIR}/source/utils/falsojni_log_redirect.h"
+)
+
 add_subdirectory(lib/libc_bridge)
 add_dependencies(${CMAKE_PROJECT_NAME} SceLibcBridge)
 

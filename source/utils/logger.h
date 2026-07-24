@@ -45,6 +45,10 @@ extern "C" {
 void _log_print(int t, const char* fmt, ...)
                 __attribute__ ((format (printf, 2, 3)));
 
+void bg2v_log_reset(void);
+int bg2v_log_printf(const char *fmt, ...)
+                    __attribute__ ((format (printf, 1, 2)));
+
 #ifdef __cplusplus
 };
 #endif

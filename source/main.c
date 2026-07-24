@@ -6,6 +6,7 @@
 #include <psp2/kernel/threadmgr.h>
 
 #include <falso_jni/FalsoJNI.h>
+#include <falso_jni/FalsoJNI_ImplBridge.h>
 #include <so_util/so_util.h>
 
 #ifndef NDK_PORT
@@ -24,6 +25,18 @@ so_module so_mod;
 
 
 typedef int (*bg2_jni_on_load_fn)(void *jvm);
+typedef jint (*bg2_sdl_native_init_fn)(
+    JNIEnv *env, jclass activity_class, jobject arguments);
+
+enum bg2_bootstrap_state {
+    BG2_BOOTSTRAP_NOT_STARTED = 0,
+    BG2_BOOTSTRAP_ENTERED = 1,
+    BG2_BOOTSTRAP_RETURNED = 2,
+};
+
+static volatile int bootstrap_state = BG2_BOOTSTRAP_NOT_STARTED;
+static volatile int bootstrap_result = 0;
+static bg2_sdl_native_init_fn SDLActivity_nativeInit;
 
 static bg2_jni_on_load_fn require_jni_on_load(void) {
     bg2_jni_on_load_fn entry =
@@ -35,7 +48,45 @@ static bg2_jni_on_load_fn require_jni_on_load(void) {
     return entry;
 }
 
+static bg2_sdl_native_init_fn require_sdl_native_init(void) {
+    bg2_sdl_native_init_fn entry = (bg2_sdl_native_init_fn)so_symbol(
+        &so_mod, "Java_org_libsdl_app_SDLActivity_nativeInit");
+    if (entry == NULL) {
+        fatal_error("BG2V milestone failed: SDLActivity.nativeInit was not "
+                    "exported.");
+    }
+    return entry;
+}
+
+static jobject make_sdl_arguments(void) {
+    jstring empty_argument = jni->NewStringUTF(&jni, "");
+    if (empty_argument == NULL) {
+        fatal_error("BG2V could not create the SDL argument string.");
+    }
+
+    jobjectArray arguments = jni->NewObjectArray(
+        &jni, 1, (jclass)0x42424242, empty_argument);
+    if (arguments == NULL) {
+        fatal_error("BG2V could not create the SDL argument array.");
+    }
+    return arguments;
+}
+
+static int bg2_sdl_thread(SceSize args, void *argp) {
+    (void)args;
+    jobject arguments = *(jobject *)argp;
+    bootstrap_state = BG2_BOOTSTRAP_ENTERED;
+    bg2v_log_printf("[BG2V] Entering SDLActivity.nativeInit\n");
+    bootstrap_result = SDLActivity_nativeInit(
+        &jni, (jclass)0x42424242, arguments);
+    bootstrap_state = BG2_BOOTSTRAP_RETURNED;
+    bg2v_log_printf("[BG2V] SDLActivity.nativeInit returned %d\n",
+                    bootstrap_result);
+    return 0;
+}
+
 int main() {
+    bg2v_log_reset();
     soloader_init_all();
 
     bg2_jni_on_load_fn JNI_OnLoad = require_jni_on_load();
@@ -49,15 +100,33 @@ int main() {
     gl_init();
 
 #ifndef NDK_PORT
-    /*
-     * Deliberate proof-of-concept stop. The next milestone will provide the
-     * SDLActivity Java callbacks and invoke nativeInit on its own thread.
-     * Stopping visibly here distinguishes a successful loader/JNI bootstrap
-     * from a black-screen hang.
-     */
-    fatal_error("BG2V loader milestone passed.\n\n"
-                "libBaldursGate.so loaded, imports resolved, JNI_OnLoad "
-                "returned 0x%x, and VitaGL initialized.", jni_version);
+    SDLActivity_nativeInit = require_sdl_native_init();
+    jobject arguments = make_sdl_arguments();
+    SceUID thread = sceKernelCreateThread(
+        "bg2v_sdl_main", bg2_sdl_thread, 0x10000100,
+        1024 * 1024, 0, 0, NULL);
+    if (thread < 0) {
+        fatal_error("BG2V could not create the SDL thread (0x%08x).", thread);
+    }
+    int start_result = sceKernelStartThread(
+        thread, sizeof(arguments), &arguments);
+    if (start_result < 0) {
+        fatal_error("BG2V could not start the SDL thread (0x%08x).",
+                    start_result);
+    }
+
+    for (int elapsed_ms = 0; elapsed_ms < 15000; elapsed_ms += 100) {
+        if (bootstrap_state == BG2_BOOTSTRAP_RETURNED) {
+            fatal_error("SDLActivity.nativeInit returned %d.\n\n"
+                        "Please send ux0:data/bg2v/bootstrap.log.",
+                        bootstrap_result);
+        }
+        sceKernelDelayThread(100 * 1000);
+    }
+
+    fatal_error("SDLActivity.nativeInit stayed active for 15 seconds.\n\n"
+                "This is progress. Please send "
+                "ux0:data/bg2v/bootstrap.log.");
 #else
     // Build a fake ANativeActivity that the game's onCreate will receive
     ANativeActivity *activity = malloc(sizeof(ANativeActivity));
