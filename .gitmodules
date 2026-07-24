@@ -1,0 +1,12 @@
+[submodule "lib/falso_jni"]
+	path = lib/falso_jni
+	url = https://github.com/v-atamanenko/FalsoJNI.git
+[submodule "lib/so_util"]
+	path = lib/so_util
+	url = https://github.com/Rinnegatamante/so_util.git
+[submodule "lib/falso_ndk"]
+	path = lib/falso_ndk
+	url = https://github.com/elliencode/FalsoNDK.git
+[submodule "lib/vitagl"]
+	path = lib/vitagl
+	url = https://github.com/Rinnegatamante/vitaGL.git

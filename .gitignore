@@ -6,5 +6,6 @@
 /analysis/python-packages/
 /analysis/gemrb-test/
 /analysis/gemrb-game/
+/analysis/reference/
 __pycache__/
 *.pyc
