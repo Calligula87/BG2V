@@ -27,6 +27,10 @@ extern "C"
 #endif
 
 #define SCE_KERNEL_MEMBLOCK_TYPE_USER_RX (0x0C20D050)
+#define KUSER_HELPER_BASE ((uintptr_t)0x97000000)
+#define KUSER_HELPER_SIZE ((size_t)0x1000)
+#define KUSER_MEMORY_BARRIER (KUSER_HELPER_BASE + 0xFA0)
+#define KUSER_CMPXCHG (KUSER_HELPER_BASE + 0xFC0)
 
 #include "utils/logger.h"
 #include "utils/dialog.h"
@@ -37,30 +41,59 @@ void __kuser_memory_barrier(void) {
 	__sync_synchronize();
 }
 
+static bool ranges_overlap(uintptr_t a, size_t a_size,
+						   uintptr_t b, size_t b_size) {
+	return a < b + b_size && b < a + a_size;
+}
+
+static void verify_kuser_page(void) {
+	if (ranges_overlap(KUSER_HELPER_BASE, KUSER_HELPER_SIZE,
+					   so_mod.text_base, so_mod.text_size)) {
+		fatal_error("BG2V internal error: atomic helper page overlaps engine text.");
+	}
+
+	for (int i = 0; i < so_mod.n_data; ++i) {
+		if (ranges_overlap(KUSER_HELPER_BASE, KUSER_HELPER_SIZE,
+						   so_mod.data_base[i], so_mod.data_size[i])) {
+			fatal_error("BG2V internal error: atomic helper page overlaps "
+						"engine data segment %d.", i);
+		}
+	}
+}
+
 void kuser_patch(void) {
+	verify_kuser_page();
+
 	SceKernelAllocMemBlockKernelOpt opt;
 	memset(&opt, 0, sizeof(SceKernelAllocMemBlockKernelOpt));
 	opt.size = sizeof(SceKernelAllocMemBlockKernelOpt);
 	opt.attr = 0x1;
-	opt.field_C = (SceUInt32)0x9A000000;
-	if (kuKernelAllocMemBlock("atomic", SCE_KERNEL_MEMBLOCK_TYPE_USER_RX, 0x1000, &opt) < 0)
-		fatal_error("Error could not allocate atomic block.");
-	kuKernelMemProtect((void *)0x9A000000, (SceSize)0x1000, KU_KERNEL_PROT_EXEC | KU_KERNEL_PROT_READ | KU_KERNEL_PROT_WRITE);
+	opt.field_C = (SceUInt32)KUSER_HELPER_BASE;
+	int block_id = kuKernelAllocMemBlock(
+		"bg2v_atomic", SCE_KERNEL_MEMBLOCK_TYPE_USER_RX,
+		KUSER_HELPER_SIZE, &opt);
+	if (block_id < 0) {
+		fatal_error("BG2V could not allocate atomic helper page at 0x%08x "
+					"(error 0x%08x).", KUSER_HELPER_BASE, block_id);
+	}
+	kuKernelMemProtect((void *)KUSER_HELPER_BASE, KUSER_HELPER_SIZE,
+					   KU_KERNEL_PROT_EXEC | KU_KERNEL_PROT_READ |
+					   KU_KERNEL_PROT_WRITE);
 
-	hook_addr(0x9A000FA0, (uintptr_t)__kuser_memory_barrier);
-	hook_addr(0x9A000FC0, (uintptr_t)__atomic_cmpxchg);
+	hook_addr(KUSER_MEMORY_BARRIER, (uintptr_t)__kuser_memory_barrier);
+	hook_addr(KUSER_CMPXCHG, (uintptr_t)__atomic_cmpxchg);
 
 	uint32_t patched_addr;
 	for (uint32_t addr = so_mod.text_base; addr < so_mod.text_base + so_mod.text_size; addr += 4) {
 		uint32_t *a = (uint32_t *)addr;
 		if (*a == 0xFFFF0FC0) {
 			l_debug("Patching 0x%x -> __kuser_cmpxchg", a);
-			patched_addr = 0x9A000FC0;
+			patched_addr = KUSER_CMPXCHG;
 			kuKernelCpuUnrestrictedMemcpy((void *)(addr), &patched_addr, sizeof(uint32_t));
 		}
 		else if (*a == 0xFFFF0FA0) {
 			l_debug("Patching 0x%x -> __kuser_memory_barrier", a);
-			patched_addr = 0x9A000FA0;
+			patched_addr = KUSER_MEMORY_BARRIER;
 			kuKernelCpuUnrestrictedMemcpy((void *)(addr), &patched_addr, sizeof(uint32_t));
 		}
 	}
