@@ -25,11 +25,18 @@ from Git.
 Selected route: **bounded direct Android ARMv7 wrapper proof of concept**, with
 GemRB retained as the fallback.
 
+Device milestone W1/W2 bootstrap passed on 24 July 2026:
+
+- the original ARMv7 `libBaldursGate.so` loaded and relocated on Vita;
+- the initial import table resolved;
+- `JNI_OnLoad` accepted the fake VM and returned JNI 1.4 (`0x00010004`);
+- vitaGL initialized successfully.
+
 The first direct-wrapper skeleton is now based on the MIT-licensed
 [`soloader-boilerplate`](https://github.com/v-atamanenko/soloader-boilerplate).
 It pins FalsoJNI, `so_util`, FalsoNDK, and vitaGL as Git submodules.
 
-The current device milestone is intentionally small:
+The completed first device milestone was intentionally small:
 
 1. load the user-supplied `ux0:data/bg2v/libBaldursGate.so`;
 2. relocate it and resolve its Android imports;

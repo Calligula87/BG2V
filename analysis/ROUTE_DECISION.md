@@ -171,6 +171,21 @@ first frame without extensive binary patching.
 - Supply SDL/Engine method IDs used during startup.
 - Enter `SDLActivity_nativeInit`.
 
+### Device result — 24 July 2026
+
+The first real-hardware build passed the loader/bootstrap portion of W1 and W2:
+
+- `libBaldursGate.so` mapped and relocated successfully;
+- the current compatibility import table resolved without a fatal error;
+- `JNI_OnLoad` returned `0x00010004` (JNI 1.4);
+- vitaGL initialized;
+- the wrapper reached its deliberate success stop.
+
+This proves that the inspected Android ARMv7 engine can execute on the Vita CPU
+through the direct-wrapper architecture. The remaining W2 task is the guarded
+`SDLActivity.nativeInit(Ljava/lang/Object;)I` bootstrap and its native-to-Java
+callback surface.
+
 ### Gate W3 — data
 
 - Provide deterministic Vita paths for main data, language data, saves, cache,
