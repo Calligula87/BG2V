@@ -4,8 +4,9 @@
 #include "utils/logger.h"
 
 /*
- * FalsoJNI normally writes only to the debug console. Redirect its existing
- * logging calls through BG2V's dual console/file logger for device iteration.
+ * FalsoJNI and so_util normally write only to the debug console. Redirect
+ * their existing logging calls through BG2V's dual console/file logger for
+ * device iteration.
  */
 #define sceClibPrintf bg2v_log_printf
 

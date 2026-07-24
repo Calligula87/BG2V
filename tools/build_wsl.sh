@@ -38,5 +38,7 @@ cmake --build "$NATIVE_BUILD" --parallel
 
 cp "$NATIVE_BUILD/BG2V.vpk" "$PROJECT_DIR/artifacts/BG2V-debug.vpk"
 cp "$NATIVE_BUILD/eboot.bin" "$PROJECT_DIR/artifacts/eboot-debug.bin"
+cp "$NATIVE_BUILD/bg2v" "$PROJECT_DIR/artifacts/bg2v-debug.elf"
 sha256sum "$PROJECT_DIR/artifacts/BG2V-debug.vpk" \
-    "$PROJECT_DIR/artifacts/eboot-debug.bin"
+    "$PROJECT_DIR/artifacts/eboot-debug.bin" \
+    "$PROJECT_DIR/artifacts/bg2v-debug.elf"

@@ -131,6 +131,7 @@ add_executable(${CMAKE_PROJECT_NAME} ${SOURCES})
 
 set_source_files_properties(
     lib/falso_jni/FalsoJNI_Logger.c
+    lib/so_util/so_util.c
     PROPERTIES
     COMPILE_OPTIONS
     "-include;${CMAKE_SOURCE_DIR}/source/utils/falsojni_log_redirect.h"

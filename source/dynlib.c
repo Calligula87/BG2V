@@ -1069,6 +1069,7 @@ so_default_dynlib default_dynlib[] = {
 
         // Signals
         { "bsd_signal", (uintptr_t)&signal },
+        { "signal", (uintptr_t)&signal },
         { "raise", (uintptr_t)&raise },
         { "sigaction", (uintptr_t)&sigaction },
 
