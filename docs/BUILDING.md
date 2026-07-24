@@ -29,15 +29,23 @@ git submodule update --init --recursive
 
 ## Build
 
-Set `VITASDK` to the soft-float SDK installation, then:
+On Windows, run these commands inside Ubuntu WSL:
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
+./tools/setup_wsl_softfp.sh
+./tools/build_wsl.sh
 ```
 
-Debug is intentional for the first run because unresolved imports and JNI
-lookups must appear in the log. The output will be `build/BG2V.vpk`.
+The setup script installs the SDK separately at `~/vitasdk-softfp` and will not
+overwrite another VitaSDK. The build script refuses to use a hard-float
+compiler. Debug is intentional for the first run because unresolved imports and
+JNI lookups must appear in the log. The script stages the build on WSL's native
+filesystem because Vita's VPK tool cannot handle spaces in Windows paths. It
+copies the results back to `artifacts/BG2V-debug.vpk` and
+`artifacts/eboot-debug.bin`; this directory is intentionally ignored by Git.
+
+On Linux, either use the same scripts or set `VITASDK` to an existing soft-float
+SDK and run CMake manually.
 
 ## Device data
 

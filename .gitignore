@@ -7,5 +7,7 @@
 /analysis/gemrb-test/
 /analysis/gemrb-game/
 /analysis/reference/
+/artifacts/
+/build-wsl/
 __pycache__/
 *.pyc
