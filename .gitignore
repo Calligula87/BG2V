@@ -1,0 +1,7 @@
+# User-supplied proprietary game files
+/input/
+
+# Extracted APK/OBB analysis material
+/analysis/apk-small/
+/analysis/python-packages/
+
