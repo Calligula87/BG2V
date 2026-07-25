@@ -19,6 +19,9 @@ enum bg2_java_method_id {
 	METHOD_SEND_MESSAGE,
 	METHOD_GET_CONTEXT,
 	METHOD_GET_APK_PATH,
+	METHOD_GET_EXTERNAL_STORAGE_STATE,
+	METHOD_GET_FILES_DIR,
+	METHOD_GET_ABSOLUTE_PATH,
 };
 
 static jobject getNativeSurface(jmethodID id, va_list args) {
@@ -125,6 +128,27 @@ static jobject getAPKPath(jmethodID id, va_list args) {
 	return jni->NewStringUTF(&jni, path);
 }
 
+static jobject getExternalStorageState(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	bg2v_log_printf("[BG2V][JNI] getExternalStorageState -> mounted\n");
+	return jni->NewStringUTF(&jni, "mounted");
+}
+
+static jobject getFilesDir(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	/* File object token consumed only by getAbsolutePath below. */
+	return (jobject)0x42420003;
+}
+
+static jobject getAbsolutePath(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	bg2v_log_printf("[BG2V][JNI] getAbsolutePath -> %s\n", DATA_PATH);
+	return jni->NewStringUTF(&jni, DATA_PATH);
+}
+
 NameToMethodID nameToMethodId[] = {
 	{ METHOD_GET_NATIVE_SURFACE, "getNativeSurface", METHOD_TYPE_OBJECT },
 	{ METHOD_AUDIO_INIT, "audioInit", METHOD_TYPE_INT },
@@ -136,6 +160,9 @@ NameToMethodID nameToMethodId[] = {
 	{ METHOD_SEND_MESSAGE, "sendMessage", METHOD_TYPE_BOOLEAN },
 	{ METHOD_GET_CONTEXT, "getContext", METHOD_TYPE_OBJECT },
 	{ METHOD_GET_APK_PATH, "getAPKPath", METHOD_TYPE_OBJECT },
+	{ METHOD_GET_EXTERNAL_STORAGE_STATE, "getExternalStorageState", METHOD_TYPE_OBJECT },
+	{ METHOD_GET_FILES_DIR, "getFilesDir", METHOD_TYPE_OBJECT },
+	{ METHOD_GET_ABSOLUTE_PATH, "getAbsolutePath", METHOD_TYPE_OBJECT },
 };
 
 MethodsBoolean methodsBoolean[] = {
@@ -154,6 +181,9 @@ MethodsObject methodsObject[] = {
 	{ METHOD_INPUT_GET_INPUT_DEVICE_IDS, inputGetInputDeviceIds },
 	{ METHOD_GET_CONTEXT, getContext },
 	{ METHOD_GET_APK_PATH, getAPKPath },
+	{ METHOD_GET_EXTERNAL_STORAGE_STATE, getExternalStorageState },
+	{ METHOD_GET_FILES_DIR, getFilesDir },
+	{ METHOD_GET_ABSOLUTE_PATH, getAbsolutePath },
 };
 MethodsShort methodsShort[] = {};
 MethodsVoid methodsVoid[] = {
