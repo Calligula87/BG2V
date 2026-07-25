@@ -82,6 +82,14 @@ struct dirent64_bionic * readdir_soloader(DIR *dir);
 int readdir_r_soloader(DIR * dirp, dirent64_bionic * entry,
                        dirent64_bionic ** result);
 
+int scandir_soloader(const char *path, dirent64_bionic ***namelist,
+                     int (*filter)(const dirent64_bionic *),
+                     int (*compare)(const dirent64_bionic **,
+                                    const dirent64_bionic **));
+
+int alphasort_soloader(const dirent64_bionic **left,
+                       const dirent64_bionic **right);
+
 int close_soloader(int fd);
 
 int fclose_soloader(FILE *f);

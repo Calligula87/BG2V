@@ -22,6 +22,9 @@ enum bg2_java_method_id {
 	METHOD_GET_EXTERNAL_STORAGE_STATE,
 	METHOD_GET_FILES_DIR,
 	METHOD_GET_ABSOLUTE_PATH,
+	METHOD_GET_EXTERNAL_FILES_DIR,
+	METHOD_IS_WIFI_ON,
+	METHOD_WRITE_TO_LOG,
 };
 
 static jobject getNativeSurface(jmethodID id, va_list args) {
@@ -149,6 +152,33 @@ static jobject getAbsolutePath(jmethodID id, va_list args) {
 	return jni->NewStringUTF(&jni, DATA_PATH);
 }
 
+static jobject getExternalFilesDir(jmethodID id, va_list args) {
+	(void)id;
+	(void)va_arg(args, jobject);
+	/* File object token consumed by getAbsolutePath. */
+	return (jobject)0x42420004;
+}
+
+static jboolean isWiFiOn(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	/* Keep the bootstrap deterministic and offline. */
+	return JNI_FALSE;
+}
+
+static jboolean writeToLog(jmethodID id, va_list args) {
+	(void)id;
+	jstring message = va_arg(args, jstring);
+	if (message) {
+		char *text = (char *)jni->GetStringUTFChars(&jni, message, NULL);
+		if (text) {
+			bg2v_log_printf("[BG2V][JAVA] %s\n", text);
+			jni->ReleaseStringUTFChars(&jni, message, text);
+		}
+	}
+	return JNI_TRUE;
+}
+
 NameToMethodID nameToMethodId[] = {
 	{ METHOD_GET_NATIVE_SURFACE, "getNativeSurface", METHOD_TYPE_OBJECT },
 	{ METHOD_AUDIO_INIT, "audioInit", METHOD_TYPE_INT },
@@ -163,10 +193,15 @@ NameToMethodID nameToMethodId[] = {
 	{ METHOD_GET_EXTERNAL_STORAGE_STATE, "getExternalStorageState", METHOD_TYPE_OBJECT },
 	{ METHOD_GET_FILES_DIR, "getFilesDir", METHOD_TYPE_OBJECT },
 	{ METHOD_GET_ABSOLUTE_PATH, "getAbsolutePath", METHOD_TYPE_OBJECT },
+	{ METHOD_GET_EXTERNAL_FILES_DIR, "getExternalFilesDir", METHOD_TYPE_OBJECT },
+	{ METHOD_IS_WIFI_ON, "IsWiFiOn", METHOD_TYPE_BOOLEAN },
+	{ METHOD_WRITE_TO_LOG, "writeToLog", METHOD_TYPE_BOOLEAN },
 };
 
 MethodsBoolean methodsBoolean[] = {
 	{ METHOD_SEND_MESSAGE, sendMessage },
+	{ METHOD_IS_WIFI_ON, isWiFiOn },
+	{ METHOD_WRITE_TO_LOG, writeToLog },
 };
 MethodsByte methodsByte[] = {};
 MethodsChar methodsChar[] = {};
@@ -184,6 +219,7 @@ MethodsObject methodsObject[] = {
 	{ METHOD_GET_EXTERNAL_STORAGE_STATE, getExternalStorageState },
 	{ METHOD_GET_FILES_DIR, getFilesDir },
 	{ METHOD_GET_ABSOLUTE_PATH, getAbsolutePath },
+	{ METHOD_GET_EXTERNAL_FILES_DIR, getExternalFilesDir },
 };
 MethodsShort methodsShort[] = {};
 MethodsVoid methodsVoid[] = {

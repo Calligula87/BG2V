@@ -162,6 +162,81 @@ int readdir_r_soloader(DIR * dirp, dirent64_bionic * entry,
     return ret;
 }
 
+static int (*scandir_compare)(
+    const dirent64_bionic **, const dirent64_bionic **);
+
+static int scandir_qsort_compare(const void *left, const void *right) {
+    return scandir_compare(
+        (const dirent64_bionic **)left,
+        (const dirent64_bionic **)right);
+}
+
+int scandir_soloader(const char *path, dirent64_bionic ***namelist,
+                     int (*filter)(const dirent64_bionic *),
+                     int (*compare)(const dirent64_bionic **,
+                                    const dirent64_bionic **)) {
+    DIR *directory = opendir(path);
+    if (!directory) {
+        l_warn("scandir(%s): directory not found", path);
+        return -1;
+    }
+
+    size_t count = 0;
+    size_t capacity = 16;
+    dirent64_bionic **entries = malloc(capacity * sizeof(*entries));
+    if (!entries) {
+        closedir(directory);
+        return -1;
+    }
+
+    struct dirent *native_entry;
+    while ((native_entry = readdir(directory)) != NULL) {
+        dirent64_bionic *entry = dirent_newlib_to_bionic(native_entry);
+        if (!entry) {
+            goto failure;
+        }
+        if (filter && !filter(entry)) {
+            free(entry);
+            continue;
+        }
+        if (count == capacity) {
+            capacity *= 2;
+            dirent64_bionic **grown =
+                realloc(entries, capacity * sizeof(*entries));
+            if (!grown) {
+                free(entry);
+                goto failure;
+            }
+            entries = grown;
+        }
+        entries[count++] = entry;
+    }
+    closedir(directory);
+
+    if (compare && count > 1) {
+        scandir_compare = compare;
+        qsort(entries, count, sizeof(*entries), scandir_qsort_compare);
+        scandir_compare = NULL;
+    }
+
+    *namelist = entries;
+    l_debug("scandir(%s): %u entries", path, (unsigned int)count);
+    return (int)count;
+
+failure:
+    closedir(directory);
+    for (size_t i = 0; i < count; ++i) {
+        free(entries[i]);
+    }
+    free(entries);
+    return -1;
+}
+
+int alphasort_soloader(const dirent64_bionic **left,
+                       const dirent64_bionic **right) {
+    return strcoll((*left)->d_name, (*right)->d_name);
+}
+
 int closedir_soloader(DIR * dir) {
     int ret = closedir(dir);
     l_debug("closedir(%p): %i", dir, ret);

@@ -1079,6 +1079,8 @@ so_default_dynlib default_dynlib[] = {
         { "strtok", (uintptr_t)&strtok },
         { "strtok_r", (uintptr_t)&strtok_r },
         { "strxfrm", (uintptr_t)&strxfrm },
+        { "scandir", (uintptr_t)&scandir_soloader },
+        { "alphasort", (uintptr_t)&alphasort_soloader },
 
 
         // Syscalls
