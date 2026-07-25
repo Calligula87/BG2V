@@ -15,6 +15,10 @@ enum bg2_java_method_id {
 	METHOD_AUDIO_WRITE_BYTE_BUFFER,
 	METHOD_AUDIO_QUIT,
 	METHOD_POLL_INPUT_DEVICES,
+	METHOD_INPUT_GET_INPUT_DEVICE_IDS,
+	METHOD_SEND_MESSAGE,
+	METHOD_GET_CONTEXT,
+	METHOD_GET_APK_PATH,
 };
 
 static jobject getNativeSurface(jmethodID id, va_list args) {
@@ -62,6 +66,65 @@ static void pollInputDevices(jmethodID id, va_list args) {
 	(void)args;
 }
 
+static jobject inputGetInputDeviceIds(jmethodID id, va_list args) {
+	(void)id;
+	jint sources = va_arg(args, jint);
+	bg2v_log_printf(
+		"[BG2V][JNI] inputGetInputDeviceIds sources=0x%x (empty)\n",
+		(unsigned int)sources);
+	return jni->NewIntArray(&jni, 0);
+}
+
+static jboolean sendMessage(jmethodID id, va_list args) {
+	(void)id;
+	jint command = va_arg(args, jint);
+	jint parameter = va_arg(args, jint);
+	bg2v_log_printf(
+		"[BG2V][JNI] sendMessage command=%d parameter=%d\n",
+		command, parameter);
+	/* SDL uses this for optional Android UI commands; acknowledge them. */
+	return JNI_TRUE;
+}
+
+static jobject getContext(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	/* Stable non-null token for code which only tests for a Context object. */
+	return (jobject)0x42420002;
+}
+
+static jobject getAPKPath(jmethodID id, va_list args) {
+	(void)id;
+	jint path_kind = va_arg(args, jint);
+	const char *path;
+
+	switch (path_kind) {
+	case -2:
+		/* Android package-code path; kept local to the user data directory. */
+		path = DATA_PATH "game.apk";
+		break;
+	case -1:
+		/* OBB directory with the trailing slash used by Beamdog's Java code. */
+		path = DATA_PATH;
+		break;
+	case 0:
+		path = DATA_PATH
+			"main.5826.com.beamdog.baldursgateIIenhancededition.obb";
+		break;
+	case 1:
+		path = DATA_PATH
+			"patch.5826.com.beamdog.baldursgateIIenhancededition.obb";
+		break;
+	default:
+		path = "";
+		break;
+	}
+
+	bg2v_log_printf(
+		"[BG2V][JNI] getAPKPath kind=%d path=%s\n", path_kind, path);
+	return jni->NewStringUTF(&jni, path);
+}
+
 NameToMethodID nameToMethodId[] = {
 	{ METHOD_GET_NATIVE_SURFACE, "getNativeSurface", METHOD_TYPE_OBJECT },
 	{ METHOD_AUDIO_INIT, "audioInit", METHOD_TYPE_INT },
@@ -69,9 +132,15 @@ NameToMethodID nameToMethodId[] = {
 	{ METHOD_AUDIO_WRITE_BYTE_BUFFER, "audioWriteByteBuffer", METHOD_TYPE_VOID },
 	{ METHOD_AUDIO_QUIT, "audioQuit", METHOD_TYPE_VOID },
 	{ METHOD_POLL_INPUT_DEVICES, "pollInputDevices", METHOD_TYPE_VOID },
+	{ METHOD_INPUT_GET_INPUT_DEVICE_IDS, "inputGetInputDeviceIds", METHOD_TYPE_OBJECT },
+	{ METHOD_SEND_MESSAGE, "sendMessage", METHOD_TYPE_BOOLEAN },
+	{ METHOD_GET_CONTEXT, "getContext", METHOD_TYPE_OBJECT },
+	{ METHOD_GET_APK_PATH, "getAPKPath", METHOD_TYPE_OBJECT },
 };
 
-MethodsBoolean methodsBoolean[] = {};
+MethodsBoolean methodsBoolean[] = {
+	{ METHOD_SEND_MESSAGE, sendMessage },
+};
 MethodsByte methodsByte[] = {};
 MethodsChar methodsChar[] = {};
 MethodsDouble methodsDouble[] = {};
@@ -82,6 +151,9 @@ MethodsInt methodsInt[] = {
 MethodsLong methodsLong[] = {};
 MethodsObject methodsObject[] = {
 	{ METHOD_GET_NATIVE_SURFACE, getNativeSurface },
+	{ METHOD_INPUT_GET_INPUT_DEVICE_IDS, inputGetInputDeviceIds },
+	{ METHOD_GET_CONTEXT, getContext },
+	{ METHOD_GET_APK_PATH, getAPKPath },
 };
 MethodsShort methodsShort[] = {};
 MethodsVoid methodsVoid[] = {
@@ -105,11 +177,14 @@ char WINDOW_SERVICE[] = "window";
 const int SDK_INT = 19; // Android 4.4 / KitKat
 
 NameToFieldID nameToFieldId[] = {
-		{ 0, "WINDOW_SERVICE", FIELD_TYPE_OBJECT },
-		{ 1, "SDK_INT", FIELD_TYPE_INT },
+	{ 0, "WINDOW_SERVICE", FIELD_TYPE_OBJECT },
+	{ 1, "SDK_INT", FIELD_TYPE_INT },
+	{ 2, "mSeparateMouseAndTouch", FIELD_TYPE_BOOLEAN },
 };
 
-FieldsBoolean fieldsBoolean[] = {};
+FieldsBoolean fieldsBoolean[] = {
+	{ 2, JNI_FALSE },
+};
 FieldsByte fieldsByte[] = {};
 FieldsChar fieldsChar[] = {};
 FieldsDouble fieldsDouble[] = {};
