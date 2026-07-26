@@ -27,6 +27,11 @@ so_module so_mod;
 typedef int (*bg2_jni_on_load_fn)(void *jvm);
 typedef jint (*bg2_sdl_native_init_fn)(
     JNIEnv *env, jclass activity_class, jobject arguments);
+typedef void (*bg2_sdl_native_key_fn)(
+    JNIEnv *env, jclass activity_class, jint keycode);
+typedef void (*bg2_sdl_native_touch_fn)(
+    JNIEnv *env, jclass activity_class, jint device_id, jint finger_id,
+    jint action, jfloat x, jfloat y, jfloat pressure);
 
 enum bg2_bootstrap_state {
     BG2_BOOTSTRAP_NOT_STARTED = 0,
@@ -37,6 +42,9 @@ enum bg2_bootstrap_state {
 static volatile int bootstrap_state = BG2_BOOTSTRAP_NOT_STARTED;
 static volatile int bootstrap_result = 0;
 static bg2_sdl_native_init_fn SDLActivity_nativeInit;
+static bg2_sdl_native_key_fn SDLActivity_onNativeKeyDown;
+static bg2_sdl_native_key_fn SDLActivity_onNativeKeyUp;
+static bg2_sdl_native_touch_fn SDLActivity_onNativeTouch;
 
 static bg2_jni_on_load_fn require_jni_on_load(void) {
     bg2_jni_on_load_fn entry =
@@ -56,6 +64,21 @@ static bg2_sdl_native_init_fn require_sdl_native_init(void) {
                     "exported.");
     }
     return entry;
+}
+
+static void require_sdl_input_bridges(void) {
+    SDLActivity_onNativeKeyDown = (bg2_sdl_native_key_fn)so_symbol(
+        &so_mod, "Java_org_libsdl_app_SDLActivity_onNativeKeyDown");
+    SDLActivity_onNativeKeyUp = (bg2_sdl_native_key_fn)so_symbol(
+        &so_mod, "Java_org_libsdl_app_SDLActivity_onNativeKeyUp");
+    SDLActivity_onNativeTouch = (bg2_sdl_native_touch_fn)so_symbol(
+        &so_mod, "Java_org_libsdl_app_SDLActivity_onNativeTouch");
+
+    if (!SDLActivity_onNativeKeyDown || !SDLActivity_onNativeKeyUp ||
+        !SDLActivity_onNativeTouch) {
+        fatal_error("BG2V could not resolve SDL's native input callbacks.");
+    }
+    bg2v_log_printf("[BG2V] SDL key and touch bridges resolved\n");
 }
 
 static jobject make_sdl_arguments(void) {
@@ -101,6 +124,7 @@ int main() {
 
 #ifndef NDK_PORT
     SDLActivity_nativeInit = require_sdl_native_init();
+    require_sdl_input_bridges();
     jobject arguments = make_sdl_arguments();
     SceUID thread = sceKernelCreateThread(
         "bg2v_sdl_main", bg2_sdl_thread, 0x10000100,
@@ -131,7 +155,8 @@ int main() {
                 milestone_logged = 1;
             }
         }
-        sceKernelDelayThread(100 * 1000);
+        controls_poll();
+        sceKernelDelayThread(16 * 1000);
     }
 #else
     // Build a fake ANativeActivity that the game's onCreate will receive
@@ -168,11 +193,30 @@ int main() {
 
 #ifndef NDK_PORT
 void controls_handler_key(int32_t keycode, ControlsAction action) {
-    // Call into the .so here
+    if (action == CONTROLS_ACTION_DOWN) {
+        SDLActivity_onNativeKeyDown(&jni, (jclass)0x42424242, keycode);
+    } else if (action == CONTROLS_ACTION_UP) {
+        SDLActivity_onNativeKeyUp(&jni, (jclass)0x42424242, keycode);
+    }
 }
 
 void controls_handler_touch(int32_t id, float x, float y, ControlsAction action) {
-    // Call into the .so here
+    jint android_action;
+    switch (action) {
+    case CONTROLS_ACTION_DOWN:
+        android_action = 0; /* MotionEvent.ACTION_DOWN */
+        break;
+    case CONTROLS_ACTION_UP:
+        android_action = 1; /* MotionEvent.ACTION_UP */
+        break;
+    default:
+        android_action = 2; /* MotionEvent.ACTION_MOVE */
+        break;
+    }
+
+    SDLActivity_onNativeTouch(
+        &jni, (jclass)0x42424242, 0, id, android_action,
+        x / 960.0f, y / 544.0f, 1.0f);
 }
 
 void controls_handler_analog(ControlsStickId which, float x, float y, ControlsAction action) {

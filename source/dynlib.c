@@ -690,7 +690,8 @@ so_default_dynlib default_dynlib[] = {
         { "eglQueryContext", (uintptr_t)&eglQueryContext },
         { "eglQueryString", (uintptr_t)&eglQueryString },
         { "eglQuerySurface", (uintptr_t)&eglQuerySurface },
-        { "eglSwapBuffers", (uintptr_t)&eglSwapBuffers },
+        { "eglSwapBuffers", (uintptr_t)&eglSwapBuffers_soloader },
+        { "eglSwapInterval", (uintptr_t)&eglSwapInterval_soloader },
         { "eglTerminate", (uintptr_t)&eglTerminate },
 
 
@@ -1239,7 +1240,12 @@ so_default_dynlib default_dynlib[] = {
 void *dlsym_soloader(void * handle, const char * symbol) {
     for (int i = 0; i < sizeof(default_dynlib) / sizeof(default_dynlib[0]); i++) {
         if (strcmp(symbol, default_dynlib[i].symbol) == 0) {
-            return &default_dynlib[i].func;
+            /*
+             * Return the function address stored in the table, not the
+             * address of the table slot itself. SDL calls dynamically
+             * resolved EGL functions directly.
+             */
+            return (void *)default_dynlib[i].func;
         }
     }
 

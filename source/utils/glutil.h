@@ -27,6 +27,10 @@ void gl_preload();
 
 void gl_swap();
 
+EGLBoolean eglSwapBuffers_soloader(EGLDisplay display, EGLSurface surface);
+
+EGLBoolean eglSwapInterval_soloader(EGLDisplay display, EGLint interval);
+
 void glCompileShader_soloader(GLuint shader);
 
 void glShaderSource_soloader(GLuint shader, GLsizei count,

@@ -44,6 +44,38 @@ void gl_swap() {
     vglSwapBuffers(GL_FALSE);
 }
 
+/*
+ * SDL resolves the EGL entry points dynamically. Keep the bridge visible in
+ * bootstrap.log so a device test can distinguish "the engine is drawing
+ * black" from "the engine never presents a frame".
+ *
+ * For the first few seconds, paint the back buffer magenta immediately before
+ * presenting it. This diagnostic marker proves the VitaGL display path
+ * independently of BG2's shaders and assets; later frames are left untouched.
+ */
+EGLBoolean eglSwapBuffers_soloader(EGLDisplay display, EGLSurface surface) {
+    (void)display;
+    (void)surface;
+
+    static unsigned int swap_count;
+    ++swap_count;
+    if (swap_count <= 5 || (swap_count % 300) == 0) {
+        bg2v_log_printf("[BG2V][EGL] swap #%u\n", swap_count);
+    }
+
+    if (swap_count <= 180) {
+        glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
+    gl_swap();
+    return EGL_TRUE;
+}
+
+EGLBoolean eglSwapInterval_soloader(EGLDisplay display, EGLint interval) {
+    bg2v_log_printf("[BG2V][EGL] swap interval=%d\n", interval);
+    return eglSwapInterval(display, interval);
+}
+
 void glShaderSource_soloader(GLuint shader, GLsizei count,
                              const GLchar **string, const GLint *_length) {
 #ifdef DEBUG_OPENGL
