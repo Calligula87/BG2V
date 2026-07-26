@@ -25,6 +25,7 @@ enum bg2_java_method_id {
 	METHOD_GET_EXTERNAL_FILES_DIR,
 	METHOD_IS_WIFI_ON,
 	METHOD_WRITE_TO_LOG,
+	METHOD_GET_LANGUAGE_STRING,
 };
 
 static jobject getNativeSurface(jmethodID id, va_list args) {
@@ -179,6 +180,13 @@ static jboolean writeToLog(jmethodID id, va_list args) {
 	return JNI_TRUE;
 }
 
+static jobject getLanguageString(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	bg2v_log_printf("[BG2V][JNI] getLanguageString -> en_US\n");
+	return jni->NewStringUTF(&jni, "en_US");
+}
+
 NameToMethodID nameToMethodId[] = {
 	{ METHOD_GET_NATIVE_SURFACE, "getNativeSurface", METHOD_TYPE_OBJECT },
 	{ METHOD_AUDIO_INIT, "audioInit", METHOD_TYPE_INT },
@@ -196,6 +204,7 @@ NameToMethodID nameToMethodId[] = {
 	{ METHOD_GET_EXTERNAL_FILES_DIR, "getExternalFilesDir", METHOD_TYPE_OBJECT },
 	{ METHOD_IS_WIFI_ON, "IsWiFiOn", METHOD_TYPE_BOOLEAN },
 	{ METHOD_WRITE_TO_LOG, "writeToLog", METHOD_TYPE_BOOLEAN },
+	{ METHOD_GET_LANGUAGE_STRING, "getLanguageString", METHOD_TYPE_OBJECT },
 };
 
 MethodsBoolean methodsBoolean[] = {
@@ -220,6 +229,7 @@ MethodsObject methodsObject[] = {
 	{ METHOD_GET_FILES_DIR, getFilesDir },
 	{ METHOD_GET_ABSOLUTE_PATH, getAbsolutePath },
 	{ METHOD_GET_EXTERNAL_FILES_DIR, getExternalFilesDir },
+	{ METHOD_GET_LANGUAGE_STRING, getLanguageString },
 };
 MethodsShort methodsShort[] = {};
 MethodsVoid methodsVoid[] = {
