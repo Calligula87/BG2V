@@ -173,11 +173,18 @@ static void install_lua_diagnostics(void) {
 		hook_addr(loadfile, (uintptr_t)&hooked_luaL_loadfilex);
 
 	/*
-	 * libBaldursGate.so 2.6.6.13 embeds a hidden Lua 5.2 luaD_throw at this
-	 * text offset.  Its unprotected-error path is the caller of abort seen in
-	 * the Vita core dumps (return address 0x986f4171).
+	 * libBaldursGate.so 2.6.6.13 embeds a hidden Lua 5.2 luaD_throw 0x8ec
+	 * bytes after exported lua_getinfo.  Deriving it from a public symbol
+	 * avoids double-counting the ELF executable segment's 0x3a0000 vaddr.
+	 * Its unprotected-error path is the caller of abort seen in the Vita core
+	 * dumps (return address 0x986f4171).
 	 */
-	uintptr_t lua_throw = so_mod.text_base + 0x006f414c + 1;
+	uintptr_t lua_getinfo =
+		so_symbol(&so_mod, "lua_getinfo") & ~(uintptr_t)1;
+	uintptr_t lua_throw = lua_getinfo + 0x8ec + 1;
+	bg2v_log_printf(
+		"[BG2V][LUA] hook addresses getinfo=0x%08x throw=0x%08x\n",
+		(unsigned int)lua_getinfo, (unsigned int)lua_throw);
 	lua_throw_hook =
 		hook_addr(lua_throw, (uintptr_t)&hooked_luaD_throw);
 	l_success("Lua diagnostics installed.");
