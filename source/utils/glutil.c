@@ -76,6 +76,16 @@ EGLBoolean eglSwapInterval_soloader(EGLDisplay display, EGLint interval) {
     return eglSwapInterval(display, interval);
 }
 
+EGLBoolean eglWaitGL_soloader(void) {
+    bg2v_log_printf("[BG2V][EGL] eglWaitGL\n");
+    return EGL_TRUE;
+}
+
+EGLBoolean eglWaitNative_soloader(EGLint engine) {
+    bg2v_log_printf("[BG2V][EGL] eglWaitNative engine=%d\n", engine);
+    return EGL_TRUE;
+}
+
 void glShaderSource_soloader(GLuint shader, GLsizei count,
                              const GLchar **string, const GLint *_length) {
 #ifdef DEBUG_OPENGL

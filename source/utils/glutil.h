@@ -31,6 +31,10 @@ EGLBoolean eglSwapBuffers_soloader(EGLDisplay display, EGLSurface surface);
 
 EGLBoolean eglSwapInterval_soloader(EGLDisplay display, EGLint interval);
 
+EGLBoolean eglWaitGL_soloader(void);
+
+EGLBoolean eglWaitNative_soloader(EGLint engine);
+
 void glCompileShader_soloader(GLuint shader);
 
 void glShaderSource_soloader(GLuint shader, GLsizei count,

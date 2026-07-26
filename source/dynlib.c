@@ -138,6 +138,33 @@ static FILE __sF_fake[3];
 void *dlsym_soloader(void * handle, const char * symbol);
 
 /*
+ * SDL's Android video backend obtains an ANativeWindow from the Java Surface
+ * before handing it to EGL. VitaGL owns the actual display, so a stable token
+ * is sufficient, but these entry points must exist for SDL to finish creating
+ * its window.
+ */
+static uint32_t bg2v_native_window_token;
+
+static void *bg2v_ANativeWindow_fromSurface(void *env, void *surface) {
+    (void)env;
+    bg2v_log_printf(
+        "[BG2V][WINDOW] fromSurface surface=%p\n", surface);
+    return &bg2v_native_window_token;
+}
+
+static void bg2v_ANativeWindow_release(void *window) {
+    bg2v_log_printf("[BG2V][WINDOW] release window=%p\n", window);
+}
+
+static int32_t bg2v_ANativeWindow_setBuffersGeometry(
+        void *window, int32_t width, int32_t height, int32_t format) {
+    bg2v_log_printf(
+        "[BG2V][WINDOW] geometry window=%p %dx%d format=%d\n",
+        window, width, height, format);
+    return 0;
+}
+
+/*
  * Android/Bionic FORTIFY entry points. The final object-size argument is a
  * runtime bounds check on Android; the Vita loader cannot reproduce Bionic's
  * abort diagnostics, so these compatibility shims preserve the underlying C
@@ -693,6 +720,16 @@ so_default_dynlib default_dynlib[] = {
         { "eglSwapBuffers", (uintptr_t)&eglSwapBuffers_soloader },
         { "eglSwapInterval", (uintptr_t)&eglSwapInterval_soloader },
         { "eglTerminate", (uintptr_t)&eglTerminate },
+        { "eglWaitGL", (uintptr_t)&eglWaitGL_soloader },
+        { "eglWaitNative", (uintptr_t)&eglWaitNative_soloader },
+
+        // Android native-window facade used by SDL's EGL backend
+        { "ANativeWindow_fromSurface",
+          (uintptr_t)&bg2v_ANativeWindow_fromSurface },
+        { "ANativeWindow_release",
+          (uintptr_t)&bg2v_ANativeWindow_release },
+        { "ANativeWindow_setBuffersGeometry",
+          (uintptr_t)&bg2v_ANativeWindow_setBuffersGeometry },
 
 
         // OpenGL

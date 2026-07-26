@@ -110,14 +110,14 @@ static ButtonMapping mapping[] = {
         { SCE_CTRL_DOWN,      AKEYCODE_DPAD_DOWN },
         { SCE_CTRL_LEFT,      AKEYCODE_DPAD_LEFT },
         { SCE_CTRL_RIGHT,     AKEYCODE_DPAD_RIGHT },
-        { SCE_CTRL_CROSS,     AKEYCODE_BUTTON_A },
-        { SCE_CTRL_CIRCLE,    AKEYCODE_BUTTON_B },
-        { SCE_CTRL_SQUARE,    AKEYCODE_BUTTON_X },
-        { SCE_CTRL_TRIANGLE,  AKEYCODE_BUTTON_Y },
-        { SCE_CTRL_L1,        AKEYCODE_BUTTON_L1 },
-        { SCE_CTRL_R1,        AKEYCODE_BUTTON_R1 },
-        { SCE_CTRL_START,     AKEYCODE_BUTTON_START },
-        { SCE_CTRL_SELECT,    AKEYCODE_BUTTON_SELECT },
+        { SCE_CTRL_CROSS,     AKEYCODE_ENTER },
+        { SCE_CTRL_CIRCLE,    AKEYCODE_BACK },
+        { SCE_CTRL_SQUARE,    AKEYCODE_SPACE },
+        { SCE_CTRL_TRIANGLE,  AKEYCODE_ESCAPE },
+        { SCE_CTRL_L1,        AKEYCODE_PAGE_UP },
+        { SCE_CTRL_R1,        AKEYCODE_PAGE_DOWN },
+        { SCE_CTRL_START,     AKEYCODE_ENTER },
+        { SCE_CTRL_SELECT,    AKEYCODE_BACK },
 };
 
 uint32_t old_buttons = 0, current_buttons = 0, pressed_buttons = 0, released_buttons = 0;

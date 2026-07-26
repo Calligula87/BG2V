@@ -32,6 +32,7 @@ static jobject getNativeSurface(jmethodID id, va_list args) {
 	(void)id;
 	(void)args;
 	/* Stable non-null token; VitaGL owns the real display surface. */
+	bg2v_log_printf("[BG2V][JNI] getNativeSurface\n");
 	return (jobject)0x42420001;
 }
 
