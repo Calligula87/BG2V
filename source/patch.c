@@ -37,6 +37,122 @@ extern "C"
 #include "reimpl/sys.h"
 #include <stdbool.h>
 
+/*
+ * The engine embeds Lua 5.2 and exports its C API.  Keep the declarations
+ * local so the diagnostic hooks do not require a second Lua implementation.
+ */
+typedef struct lua_State lua_State;
+typedef int (*lua_CFunction)(lua_State *state);
+typedef int (*lua_pcallk_fn)(lua_State *state, int nargs, int nresults,
+							int errfunc, int ctx, lua_CFunction continuation);
+typedef int (*luaL_loadbufferx_fn)(lua_State *state, const char *buffer,
+								  size_t size, const char *name,
+								  const char *mode);
+typedef int (*luaL_loadfilex_fn)(lua_State *state, const char *filename,
+								const char *mode);
+typedef const char *(*lua_tolstring_fn)(lua_State *state, int index,
+									   size_t *length);
+typedef int (*lua_gettop_fn)(lua_State *state);
+typedef void (*lua_settop_fn)(lua_State *state, int index);
+typedef void (*luaL_traceback_fn)(lua_State *state, lua_State *source,
+								  const char *message, int level);
+
+static so_hook lua_pcallk_hook;
+static so_hook lua_loadbuffer_hook;
+static so_hook lua_loadfile_hook;
+static lua_tolstring_fn engine_lua_tolstring;
+static lua_gettop_fn engine_lua_gettop;
+static lua_settop_fn engine_lua_settop;
+static luaL_traceback_fn engine_luaL_traceback;
+
+static int hooked_luaL_loadbufferx(lua_State *state, const char *buffer,
+								   size_t size, const char *name,
+								   const char *mode) {
+	bg2v_log_printf(
+		"[BG2V][LUA] loadbuffer name=%s size=%u mode=%s\n",
+		name ? name : "(null)", (unsigned int)size, mode ? mode : "(null)");
+	int result = SO_CONTINUE(
+		int, lua_loadbuffer_hook, state, buffer, size, name, mode);
+	if (result != 0 && engine_lua_tolstring != NULL) {
+		const char *error = engine_lua_tolstring(state, -1, NULL);
+		bg2v_log_printf("[BG2V][LUA] loadbuffer failed status=%d: %s\n",
+					   result, error ? error : "(non-string error)");
+	}
+	return result;
+}
+
+static int hooked_luaL_loadfilex(lua_State *state, const char *filename,
+								 const char *mode) {
+	bg2v_log_printf("[BG2V][LUA] loadfile name=%s mode=%s\n",
+				   filename ? filename : "(null)",
+				   mode ? mode : "(null)");
+	int result = SO_CONTINUE(
+		int, lua_loadfile_hook, state, filename, mode);
+	if (result != 0 && engine_lua_tolstring != NULL) {
+		const char *error = engine_lua_tolstring(state, -1, NULL);
+		bg2v_log_printf("[BG2V][LUA] loadfile failed status=%d: %s\n",
+					   result, error ? error : "(non-string error)");
+	}
+	return result;
+}
+
+static int hooked_lua_pcallk(lua_State *state, int nargs, int nresults,
+							 int errfunc, int ctx,
+							 lua_CFunction continuation) {
+	int result = SO_CONTINUE(
+		int, lua_pcallk_hook, state, nargs, nresults, errfunc, ctx,
+		continuation);
+	if (result == 0 || engine_lua_tolstring == NULL) {
+		return result;
+	}
+
+	const char *error = engine_lua_tolstring(state, -1, NULL);
+	bg2v_log_printf(
+		"[BG2V][LUA] pcall failed status=%d nargs=%d errfunc=%d: %s\n",
+		result, nargs, errfunc, error ? error : "(non-string error)");
+
+	/*
+	 * Preserve the Lua stack exactly.  The traceback is diagnostic only and
+	 * must not alter the engine's normal error handling.
+	 */
+	if (engine_lua_gettop != NULL && engine_lua_settop != NULL &&
+		engine_luaL_traceback != NULL) {
+		int top = engine_lua_gettop(state);
+		engine_luaL_traceback(
+			state, state, error ? error : "(non-string error)", 1);
+		const char *traceback = engine_lua_tolstring(state, -1, NULL);
+		bg2v_log_printf("[BG2V][LUA] traceback:\n%s\n",
+					   traceback ? traceback : "(unavailable)");
+		engine_lua_settop(state, top);
+	}
+	return result;
+}
+
+static void install_lua_diagnostics(void) {
+	uintptr_t pcallk = so_symbol(&so_mod, "lua_pcallk");
+	uintptr_t loadbuffer = so_symbol(&so_mod, "luaL_loadbufferx");
+	uintptr_t loadfile = so_symbol(&so_mod, "luaL_loadfilex");
+
+	engine_lua_tolstring =
+		(lua_tolstring_fn)so_symbol(&so_mod, "lua_tolstring");
+	engine_lua_gettop = (lua_gettop_fn)so_symbol(&so_mod, "lua_gettop");
+	engine_lua_settop = (lua_settop_fn)so_symbol(&so_mod, "lua_settop");
+	engine_luaL_traceback =
+		(luaL_traceback_fn)so_symbol(&so_mod, "luaL_traceback");
+
+	if (pcallk == 0 || loadbuffer == 0 || loadfile == 0 ||
+		engine_lua_tolstring == NULL) {
+		fatal_error("BG2V could not install Lua diagnostics.");
+	}
+
+	lua_pcallk_hook = hook_addr(pcallk, (uintptr_t)&hooked_lua_pcallk);
+	lua_loadbuffer_hook =
+		hook_addr(loadbuffer, (uintptr_t)&hooked_luaL_loadbufferx);
+	lua_loadfile_hook =
+		hook_addr(loadfile, (uintptr_t)&hooked_luaL_loadfilex);
+	l_success("Lua diagnostics installed.");
+}
+
 void __kuser_memory_barrier(void) {
 	__sync_synchronize();
 }
@@ -101,6 +217,7 @@ void kuser_patch(void) {
 
 void so_patch(void) {
 	kuser_patch();
+	install_lua_diagnostics();
 	// Sample hook with symbol name
 	// hook_addr((uintptr_t)so_symbol(&so_mod, "_ZN6glitch2os7Printer5printEPKcz"), (uintptr_t)&hookedFunction);
 	// Or with offset
