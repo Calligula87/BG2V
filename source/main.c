@@ -32,6 +32,11 @@ typedef void (*bg2_sdl_native_key_fn)(
 typedef void (*bg2_sdl_native_touch_fn)(
     JNIEnv *env, jclass activity_class, jint device_id, jint finger_id,
     jint action, jfloat x, jfloat y, jfloat pressure);
+typedef void (*bg2_sdl_native_resize_fn)(
+    JNIEnv *env, jclass activity_class, jint width, jint height,
+    jint format, jfloat refresh_rate);
+typedef void (*bg2_sdl_native_surface_fn)(
+    JNIEnv *env, jclass activity_class);
 
 enum bg2_bootstrap_state {
     BG2_BOOTSTRAP_NOT_STARTED = 0,
@@ -45,6 +50,8 @@ static bg2_sdl_native_init_fn SDLActivity_nativeInit;
 static bg2_sdl_native_key_fn SDLActivity_onNativeKeyDown;
 static bg2_sdl_native_key_fn SDLActivity_onNativeKeyUp;
 static bg2_sdl_native_touch_fn SDLActivity_onNativeTouch;
+static bg2_sdl_native_resize_fn SDLActivity_onNativeResize;
+static bg2_sdl_native_surface_fn SDLActivity_onNativeSurfaceChanged;
 
 static bg2_jni_on_load_fn require_jni_on_load(void) {
     bg2_jni_on_load_fn entry =
@@ -73,12 +80,19 @@ static void require_sdl_input_bridges(void) {
         &so_mod, "Java_org_libsdl_app_SDLActivity_onNativeKeyUp");
     SDLActivity_onNativeTouch = (bg2_sdl_native_touch_fn)so_symbol(
         &so_mod, "Java_org_libsdl_app_SDLActivity_onNativeTouch");
+    SDLActivity_onNativeResize = (bg2_sdl_native_resize_fn)so_symbol(
+        &so_mod, "Java_org_libsdl_app_SDLActivity_onNativeResize");
+    SDLActivity_onNativeSurfaceChanged =
+        (bg2_sdl_native_surface_fn)so_symbol(
+            &so_mod,
+            "Java_org_libsdl_app_SDLActivity_onNativeSurfaceChanged");
 
     if (!SDLActivity_onNativeKeyDown || !SDLActivity_onNativeKeyUp ||
-        !SDLActivity_onNativeTouch) {
-        fatal_error("BG2V could not resolve SDL's native input callbacks.");
+        !SDLActivity_onNativeTouch || !SDLActivity_onNativeResize ||
+        !SDLActivity_onNativeSurfaceChanged) {
+        fatal_error("BG2V could not resolve SDL's native activity callbacks.");
     }
-    bg2v_log_printf("[BG2V] SDL key and touch bridges resolved\n");
+    bg2v_log_printf("[BG2V] SDL input and surface bridges resolved\n");
 }
 
 static jobject make_sdl_arguments(void) {
@@ -138,6 +152,18 @@ int main() {
         fatal_error("BG2V could not start the SDL thread (0x%08x).",
                     start_result);
     }
+
+    /*
+     * Android normally delivers these callbacks from its UI thread shortly
+     * after nativeInit starts. Without them SDL retains a 0x0 display size;
+     * BG2 then divides its render coordinates by zero.
+     */
+    sceKernelDelayThread(250 * 1000);
+    SDLActivity_onNativeResize(
+        &jni, (jclass)0x42424242, 960, 544, 1, 60.0f);
+    SDLActivity_onNativeSurfaceChanged(&jni, (jclass)0x42424242);
+    bg2v_log_printf(
+        "[BG2V] SDL surface announced: 960x544 RGBA8888 @ 60 Hz\n");
 
     int elapsed_ms = 0;
     int milestone_logged = 0;

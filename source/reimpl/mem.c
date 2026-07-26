@@ -21,7 +21,9 @@ void *sceClibMemclr(void *dst, size_t len) {
 }
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs) {
-    l_warn("mmap(%p, %i, %i, %i, %i, %li)", addr, length, prot, flags, fd, offs);
+    (void)addr;
+    (void)prot;
+    (void)flags;
 
     if (length == 0 || offs < 0) {
         errno = EINVAL;
@@ -74,8 +76,6 @@ void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs) {
         if (original >= 0) {
             lseek(fd, original, SEEK_SET);
         }
-        l_debug("mmap loaded %u/%u bytes from fd %d at %li",
-                (unsigned int)total, (unsigned int)length, fd, offs);
     }
 
     return ret;

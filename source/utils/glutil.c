@@ -49,9 +49,8 @@ void gl_swap() {
  * bootstrap.log so a device test can distinguish "the engine is drawing
  * black" from "the engine never presents a frame".
  *
- * For the first few seconds, paint the back buffer magenta immediately before
- * presenting it. This diagnostic marker proves the VitaGL display path
- * independently of BG2's shaders and assets; later frames are left untouched.
+ * The first-swap trace proved the VitaGL display path on hardware. Leave the
+ * game's framebuffer untouched from now on.
  */
 EGLBoolean eglSwapBuffers_soloader(EGLDisplay display, EGLSurface surface) {
     (void)display;
@@ -63,10 +62,6 @@ EGLBoolean eglSwapBuffers_soloader(EGLDisplay display, EGLSurface surface) {
         bg2v_log_printf("[BG2V][EGL] swap #%u\n", swap_count);
     }
 
-    if (swap_count <= 180) {
-        glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-    }
     gl_swap();
     return EGL_TRUE;
 }
