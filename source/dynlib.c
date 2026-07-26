@@ -48,6 +48,8 @@
 
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
+#include <AL/al.h>
+#include <AL/alc.h>
 
 #include "reimpl/errno.h"
 #include "reimpl/io.h"
@@ -453,6 +455,34 @@ so_default_dynlib default_dynlib[] = {
         { "trunc", (uintptr_t)&trunc },
         { "truncf", (uintptr_t)&truncf },
 
+
+        // OpenAL
+        { "alGetSourcei", (uintptr_t)&alGetSourcei },
+        { "alSourceUnqueueBuffers", (uintptr_t)&alSourceUnqueueBuffers },
+        { "alBufferData", (uintptr_t)&alBufferData },
+        { "alSourceQueueBuffers", (uintptr_t)&alSourceQueueBuffers },
+        { "alSourcePlay", (uintptr_t)&alSourcePlay },
+        { "alSourceStop", (uintptr_t)&alSourceStop },
+        { "alSourcePause", (uintptr_t)&alSourcePause },
+        { "alSourcef", (uintptr_t)&alSourcef },
+        { "alSourcei", (uintptr_t)&alSourcei },
+        { "alSource3f", (uintptr_t)&alSource3f },
+        { "alGetSourcef", (uintptr_t)&alGetSourcef },
+        { "alDeleteSources", (uintptr_t)&alDeleteSources },
+        { "alGenSources", (uintptr_t)&alGenSources },
+        { "alDeleteBuffers", (uintptr_t)&alDeleteBuffers },
+        { "alGenBuffers", (uintptr_t)&alGenBuffers },
+        { "alIsBuffer", (uintptr_t)&alIsBuffer },
+        { "alListenerf", (uintptr_t)&alListenerf },
+        { "alListener3f", (uintptr_t)&alListener3f },
+        { "alListenerfv", (uintptr_t)&alListenerfv },
+        { "alDistanceModel", (uintptr_t)&alDistanceModel },
+        { "alcOpenDevice", (uintptr_t)&alcOpenDevice },
+        { "alcCloseDevice", (uintptr_t)&alcCloseDevice },
+        { "alcCreateContext", (uintptr_t)&alcCreateContext },
+        { "alcDestroyContext", (uintptr_t)&alcDestroyContext },
+        { "alcMakeContextCurrent", (uintptr_t)&alcMakeContextCurrent },
+        { "alcGetCurrentContext", (uintptr_t)&alcGetCurrentContext },
 
         // Sockets
         { "accept", (uintptr_t)&accept },

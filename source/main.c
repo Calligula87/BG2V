@@ -115,18 +115,24 @@ int main() {
                     start_result);
     }
 
-    for (int elapsed_ms = 0; elapsed_ms < 15000; elapsed_ms += 100) {
+    int elapsed_ms = 0;
+    int milestone_logged = 0;
+    for (;;) {
         if (bootstrap_state == BG2_BOOTSTRAP_RETURNED) {
             fatal_error("SDLActivity.nativeInit returned %d.\n\n"
                         "Please send ux0:data/bg2v/bootstrap.log.",
                         bootstrap_result);
         }
+        if (!milestone_logged) {
+            elapsed_ms += 100;
+            if (elapsed_ms >= 15000) {
+                l_success("SDLActivity.nativeInit stayed active for 15 "
+                          "seconds; continuing without watchdog.");
+                milestone_logged = 1;
+            }
+        }
         sceKernelDelayThread(100 * 1000);
     }
-
-    fatal_error("SDLActivity.nativeInit stayed active for 15 seconds.\n\n"
-                "This is progress. Please send "
-                "ux0:data/bg2v/bootstrap.log.");
 #else
     // Build a fake ANativeActivity that the game's onCreate will receive
     ANativeActivity *activity = malloc(sizeof(ANativeActivity));

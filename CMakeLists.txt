@@ -199,6 +199,7 @@ endif()
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
                       -Wl,--whole-archive pthread -Wl,--no-whole-archive
+                      openal
                       OpenSLES
                       sndfile
                       mp3lame
