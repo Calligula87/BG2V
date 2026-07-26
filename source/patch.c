@@ -14,6 +14,7 @@
 #include <kubridge.h>
 #include <so_util/so_util.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <vitasdk.h>
 
@@ -60,10 +61,45 @@ typedef void (*luaL_traceback_fn)(lua_State *state, lua_State *source,
 static so_hook lua_pcallk_hook;
 static so_hook lua_loadbuffer_hook;
 static so_hook lua_loadfile_hook;
+static so_hook lua_throw_hook;
 static lua_tolstring_fn engine_lua_tolstring;
 static lua_gettop_fn engine_lua_gettop;
 static lua_settop_fn engine_lua_settop;
 static luaL_traceback_fn engine_luaL_traceback;
+
+static void log_lua_error(lua_State *state, int status,
+						  const char *origin) {
+	if (engine_lua_tolstring == NULL) {
+		return;
+	}
+
+	const char *error = engine_lua_tolstring(state, -1, NULL);
+	bg2v_log_printf("[BG2V][LUA] %s status=%d: %s\n", origin, status,
+				   error ? error : "(non-string error)");
+
+	if (engine_lua_gettop != NULL && engine_lua_settop != NULL &&
+		engine_luaL_traceback != NULL) {
+		int top = engine_lua_gettop(state);
+		engine_luaL_traceback(
+			state, state, error ? error : "(non-string error)", 1);
+		const char *traceback = engine_lua_tolstring(state, -1, NULL);
+		bg2v_log_printf("[BG2V][LUA] traceback:\n%s\n",
+					   traceback ? traceback : "(unavailable)");
+		engine_lua_settop(state, top);
+	}
+}
+
+static void hooked_luaD_throw(lua_State *state, int status) {
+	log_lua_error(state, status, "luaD_throw");
+
+	/*
+	 * luaD_throw never returns: it either longjmps to a protected Lua call or
+	 * invokes abort for an unprotected error.  Use an integer continuation
+	 * type because SO_CONTINUE cannot declare a temporary of type void.
+	 */
+	(void)SO_CONTINUE(int, lua_throw_hook, state, status);
+	abort();
+}
 
 static int hooked_luaL_loadbufferx(lua_State *state, const char *buffer,
 								   size_t size, const char *name,
@@ -106,25 +142,10 @@ static int hooked_lua_pcallk(lua_State *state, int nargs, int nresults,
 		return result;
 	}
 
-	const char *error = engine_lua_tolstring(state, -1, NULL);
 	bg2v_log_printf(
-		"[BG2V][LUA] pcall failed status=%d nargs=%d errfunc=%d: %s\n",
-		result, nargs, errfunc, error ? error : "(non-string error)");
-
-	/*
-	 * Preserve the Lua stack exactly.  The traceback is diagnostic only and
-	 * must not alter the engine's normal error handling.
-	 */
-	if (engine_lua_gettop != NULL && engine_lua_settop != NULL &&
-		engine_luaL_traceback != NULL) {
-		int top = engine_lua_gettop(state);
-		engine_luaL_traceback(
-			state, state, error ? error : "(non-string error)", 1);
-		const char *traceback = engine_lua_tolstring(state, -1, NULL);
-		bg2v_log_printf("[BG2V][LUA] traceback:\n%s\n",
-					   traceback ? traceback : "(unavailable)");
-		engine_lua_settop(state, top);
-	}
+		"[BG2V][LUA] pcall context nargs=%d errfunc=%d\n",
+		nargs, errfunc);
+	log_lua_error(state, result, "pcall");
 	return result;
 }
 
@@ -150,6 +171,15 @@ static void install_lua_diagnostics(void) {
 		hook_addr(loadbuffer, (uintptr_t)&hooked_luaL_loadbufferx);
 	lua_loadfile_hook =
 		hook_addr(loadfile, (uintptr_t)&hooked_luaL_loadfilex);
+
+	/*
+	 * libBaldursGate.so 2.6.6.13 embeds a hidden Lua 5.2 luaD_throw at this
+	 * text offset.  Its unprotected-error path is the caller of abort seen in
+	 * the Vita core dumps (return address 0x986f4171).
+	 */
+	uintptr_t lua_throw = so_mod.text_base + 0x006f414c + 1;
+	lua_throw_hook =
+		hook_addr(lua_throw, (uintptr_t)&hooked_luaD_throw);
 	l_success("Lua diagnostics installed.");
 }
 
