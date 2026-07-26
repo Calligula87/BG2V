@@ -90,6 +90,8 @@ int scandir_soloader(const char *path, dirent64_bionic ***namelist,
 int alphasort_soloader(const dirent64_bionic **left,
                        const dirent64_bionic **right);
 
+int fnmatch_soloader(const char *pattern, const char *string, int flags);
+
 int close_soloader(int fd);
 
 int fclose_soloader(FILE *f);

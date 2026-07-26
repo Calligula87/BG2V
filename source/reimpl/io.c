@@ -14,6 +14,8 @@
 #include <sys/unistd.h>
 #include <stdlib.h>
 #include <dirent.h>
+#include <fnmatch.h>
+#include <ctype.h>
 #include <stdarg.h>
 #include <psp2/kernel/threadmgr.h>
 
@@ -235,6 +237,159 @@ failure:
 int alphasort_soloader(const dirent64_bionic **left,
                        const dirent64_bionic **right) {
     return strcoll((*left)->d_name, (*right)->d_name);
+}
+
+static int fnmatch_char_equal(unsigned char left, unsigned char right,
+                              int flags) {
+#ifdef FNM_CASEFOLD
+    if (flags & FNM_CASEFOLD) {
+        left = (unsigned char)tolower(left);
+        right = (unsigned char)tolower(right);
+    }
+#endif
+    return left == right;
+}
+
+static int fnmatch_range(const char **pattern, unsigned char value, int flags) {
+    const char *cursor = *pattern;
+    int negate = (*cursor == '!' || *cursor == '^');
+    int matched = 0;
+    if (negate) {
+        ++cursor;
+    }
+
+    unsigned char previous = 0;
+    int have_previous = 0;
+    while (*cursor && *cursor != ']') {
+        unsigned char current = (unsigned char)*cursor++;
+        if (current == '\\' && !(flags & FNM_NOESCAPE) && *cursor) {
+            current = (unsigned char)*cursor++;
+        }
+        if (current == '-' && have_previous && *cursor && *cursor != ']') {
+            unsigned char end = (unsigned char)*cursor++;
+            if (end == '\\' && !(flags & FNM_NOESCAPE) && *cursor) {
+                end = (unsigned char)*cursor++;
+            }
+#ifdef FNM_CASEFOLD
+            if (flags & FNM_CASEFOLD) {
+                previous = (unsigned char)tolower(previous);
+                end = (unsigned char)tolower(end);
+                value = (unsigned char)tolower(value);
+            }
+#endif
+            if (previous <= value && value <= end) {
+                matched = 1;
+            }
+            have_previous = 0;
+            continue;
+        }
+        if (fnmatch_char_equal(current, value, flags)) {
+            matched = 1;
+        }
+        previous = current;
+        have_previous = 1;
+    }
+
+    if (*cursor != ']') {
+        return -1;
+    }
+    *pattern = cursor + 1;
+    return negate ? !matched : matched;
+}
+
+static int fnmatch_impl(const char *pattern, const char *string, int flags,
+                        int at_component_start) {
+    for (;;) {
+        unsigned char token = (unsigned char)*pattern++;
+        unsigned char value = (unsigned char)*string;
+
+        if (token == '\0') {
+            if (value == '\0') {
+                return 1;
+            }
+#ifdef FNM_LEADING_DIR
+            return (flags & FNM_LEADING_DIR) && value == '/';
+#else
+            return 0;
+#endif
+        }
+
+        if (token == '*') {
+            while (*pattern == '*') {
+                ++pattern;
+            }
+            if ((flags & FNM_PERIOD) && at_component_start && value == '.') {
+                return 0;
+            }
+            if (*pattern == '\0') {
+                if (!(flags & FNM_PATHNAME)) {
+                    return 1;
+                }
+                return strchr(string, '/') == NULL
+#ifdef FNM_LEADING_DIR
+                    || (flags & FNM_LEADING_DIR)
+#endif
+                    ;
+            }
+            do {
+                if (fnmatch_impl(pattern, string, flags, at_component_start)) {
+                    return 1;
+                }
+                if (*string == '\0' ||
+                    ((flags & FNM_PATHNAME) && *string == '/')) {
+                    break;
+                }
+                ++string;
+                at_component_start = 0;
+            } while (1);
+            return 0;
+        }
+
+        if (value == '\0') {
+            return 0;
+        }
+        if ((flags & FNM_PATHNAME) && value == '/' &&
+            token != '/') {
+            return 0;
+        }
+        if ((flags & FNM_PERIOD) && at_component_start && value == '.' &&
+            token != '.') {
+            return 0;
+        }
+
+        if (token == '?') {
+            ++string;
+            at_component_start = 0;
+            continue;
+        }
+
+        if (token == '[') {
+            const char *range_pattern = pattern;
+            int range_result = fnmatch_range(&range_pattern, value, flags);
+            if (range_result >= 0) {
+                if (!range_result) {
+                    return 0;
+                }
+                pattern = range_pattern;
+                ++string;
+                at_component_start = 0;
+                continue;
+            }
+            token = '[';
+        } else if (token == '\\' && !(flags & FNM_NOESCAPE) && *pattern) {
+            token = (unsigned char)*pattern++;
+        }
+
+        if (!fnmatch_char_equal(token, value, flags)) {
+            return 0;
+        }
+        ++string;
+        at_component_start = (flags & FNM_PATHNAME) && token == '/';
+    }
+}
+
+int fnmatch_soloader(const char *pattern, const char *string, int flags) {
+    return fnmatch_impl(pattern, string, flags, 1) ? 0 : FNM_NOMATCH;
 }
 
 int closedir_soloader(DIR * dir) {

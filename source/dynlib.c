@@ -27,6 +27,8 @@
 #include <zlib.h>
 #include <locale.h>
 #include <poll.h>
+#include <fnmatch.h>
+#include <libgen.h>
 
 #include <sys/stat.h>
 #include <sys/unistd.h>
@@ -581,6 +583,8 @@ so_default_dynlib default_dynlib[] = {
 
         { "access", (uintptr_t)&access },
         { "basename", (uintptr_t)&basename },
+        { "dirname", (uintptr_t)&dirname },
+        { "fnmatch", (uintptr_t)&fnmatch_soloader },
         { "chdir", (uintptr_t)&chdir },
         { "chmod", (uintptr_t)&chmod },
         { "dup", (uintptr_t)&dup },

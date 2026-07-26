@@ -34,7 +34,7 @@ tar -C "$PROJECT_DIR" \
 
 cmake -S "$NATIVE_SOURCE" -B "$NATIVE_BUILD" \
     -DCMAKE_BUILD_TYPE=Debug
-cmake --build "$NATIVE_BUILD" --parallel
+cmake --build "$NATIVE_BUILD" --parallel "${BG2V_BUILD_JOBS:-4}"
 
 cp "$NATIVE_BUILD/BG2V.vpk" "$PROJECT_DIR/artifacts/BG2V-debug.vpk"
 cp "$NATIVE_BUILD/eboot.bin" "$PROJECT_DIR/artifacts/eboot-debug.bin"
