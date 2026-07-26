@@ -55,6 +55,11 @@ typedef const char *(*lua_tolstring_fn)(lua_State *state, int index,
 									   size_t *length);
 typedef int (*lua_gettop_fn)(lua_State *state);
 typedef void (*lua_settop_fn)(lua_State *state, int index);
+typedef int (*lua_type_fn)(lua_State *state, int index);
+typedef void (*lua_createtable_fn)(lua_State *state, int array_count,
+								   int record_count);
+typedef void (*lua_pushvalue_fn)(lua_State *state, int index);
+typedef void (*lua_setglobal_fn)(lua_State *state, const char *name);
 typedef void (*luaL_traceback_fn)(lua_State *state, lua_State *source,
 								  const char *message, int level);
 
@@ -62,10 +67,36 @@ static so_hook lua_pcallk_hook;
 static so_hook lua_loadbuffer_hook;
 static so_hook lua_loadfile_hook;
 static so_hook lua_throw_hook;
+static so_hook lua_getglobal_hook;
 static lua_tolstring_fn engine_lua_tolstring;
 static lua_gettop_fn engine_lua_gettop;
 static lua_settop_fn engine_lua_settop;
+static lua_type_fn engine_lua_type;
+static lua_createtable_fn engine_lua_createtable;
+static lua_pushvalue_fn engine_lua_pushvalue;
+static lua_setglobal_fn engine_lua_setglobal;
 static luaL_traceback_fn engine_luaL_traceback;
+
+/*
+ * The Android Java bootstrap normally creates this table before
+ * CInfButtonArray::SetTooltip starts populating it.  The Vita bootstrap has no
+ * Java VM, so create the table lazily when this exact global is first read.
+ */
+static int hooked_lua_getglobal(lua_State *state, const char *name) {
+	int result = SO_CONTINUE(int, lua_getglobal_hook, state, name);
+
+	if (name != NULL && strcmp(name, "actionBarTooltip") == 0 &&
+		engine_lua_type(state, -1) == 0) {
+		bg2v_log_printf(
+			"[BG2V][LUA] creating missing global table %s\n", name);
+		engine_lua_settop(state, -2);
+		engine_lua_createtable(state, 0, 64);
+		engine_lua_pushvalue(state, -1);
+		engine_lua_setglobal(state, name);
+	}
+
+	return result;
+}
 
 static void log_lua_error(lua_State *state, int status,
 						  const char *origin) {
@@ -153,19 +184,31 @@ static void install_lua_diagnostics(void) {
 	uintptr_t pcallk = so_symbol(&so_mod, "lua_pcallk");
 	uintptr_t loadbuffer = so_symbol(&so_mod, "luaL_loadbufferx");
 	uintptr_t loadfile = so_symbol(&so_mod, "luaL_loadfilex");
+	uintptr_t getglobal = so_symbol(&so_mod, "lua_getglobal");
 
 	engine_lua_tolstring =
 		(lua_tolstring_fn)so_symbol(&so_mod, "lua_tolstring");
 	engine_lua_gettop = (lua_gettop_fn)so_symbol(&so_mod, "lua_gettop");
 	engine_lua_settop = (lua_settop_fn)so_symbol(&so_mod, "lua_settop");
+	engine_lua_type = (lua_type_fn)so_symbol(&so_mod, "lua_type");
+	engine_lua_createtable =
+		(lua_createtable_fn)so_symbol(&so_mod, "lua_createtable");
+	engine_lua_pushvalue =
+		(lua_pushvalue_fn)so_symbol(&so_mod, "lua_pushvalue");
+	engine_lua_setglobal =
+		(lua_setglobal_fn)so_symbol(&so_mod, "lua_setglobal");
 	engine_luaL_traceback =
 		(luaL_traceback_fn)so_symbol(&so_mod, "luaL_traceback");
 
-	if (pcallk == 0 || loadbuffer == 0 || loadfile == 0 ||
-		engine_lua_tolstring == NULL) {
+	if (pcallk == 0 || loadbuffer == 0 || loadfile == 0 || getglobal == 0 ||
+		engine_lua_tolstring == NULL || engine_lua_type == NULL ||
+		engine_lua_createtable == NULL || engine_lua_pushvalue == NULL ||
+		engine_lua_setglobal == NULL) {
 		fatal_error("BG2V could not install Lua diagnostics.");
 	}
 
+	lua_getglobal_hook =
+		hook_addr(getglobal, (uintptr_t)&hooked_lua_getglobal);
 	lua_pcallk_hook = hook_addr(pcallk, (uintptr_t)&hooked_lua_pcallk);
 	lua_loadbuffer_hook =
 		hook_addr(loadbuffer, (uintptr_t)&hooked_luaL_loadbufferx);
