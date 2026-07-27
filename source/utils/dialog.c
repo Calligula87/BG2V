@@ -78,11 +78,24 @@ int init_ime_dialog(const char *title, const char *initial_text) {
     param.languagesForced = SCE_TRUE;
     param.type = SCE_IME_TYPE_BASIC_LATIN;
     param.title = ime_title_utf16;
-    param.maxTextLength = SCE_IME_DIALOG_MAX_TEXT_LENGTH;
+    /* SDL's text event payload is 31 UTF-8 bytes plus a terminator. */
+    param.maxTextLength = 31;
     param.initialText = ime_initial_text_utf16;
     param.inputTextBuffer = ime_input_text_utf16;
 
     return sceImeDialogInit(&param);
+}
+
+const char *get_ime_dialog_live_text(void) {
+    /*
+     * SceIme updates inputTextBuffer while the dialog is open. Forwarding
+     * these intermediate values reproduces Android InputConnection's
+     * setComposingText calls instead of waiting until BG2 has already closed
+     * its edit focus.
+     */
+    sceClibMemset(ime_input_text_utf8, 0, sizeof(ime_input_text_utf8));
+    _utf16_to_utf8(ime_input_text_utf16, ime_input_text_utf8);
+    return (const char *)ime_input_text_utf8;
 }
 
 char *get_ime_dialog_result(void) {
@@ -93,7 +106,9 @@ char *get_ime_dialog_result(void) {
     sceClibMemset(&result, 0, sizeof(SceImeDialogResult));
     sceImeDialogGetResult(&result);
     if (result.button == SCE_IME_DIALOG_BUTTON_ENTER)
-        _utf16_to_utf8(ime_input_text_utf16, ime_input_text_utf8);
+        get_ime_dialog_live_text();
+    else
+        ime_input_text_utf8[0] = '\0';
     sceImeDialogTerm();
     // For some reason analog stick stops working after ime
     sceCtrlSetSamplingModeExt(SCE_CTRL_MODE_ANALOG_WIDE);

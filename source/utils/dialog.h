@@ -23,6 +23,8 @@ int init_ime_dialog(const char *title, const char *initial_text);
 
 char *get_ime_dialog_result(void);
 
+const char *get_ime_dialog_live_text(void);
+
 int init_msg_dialog(const char *msg);
 
 int get_msg_dialog_result(void);

@@ -68,6 +68,7 @@ static so_hook lua_pcallk_hook;
 static so_hook lua_loadbuffer_hook;
 static so_hook lua_loadfile_hook;
 static so_hook lua_throw_hook;
+static so_hook sdl_poll_event_hook;
 static lua_tolstring_fn engine_lua_tolstring;
 static lua_gettop_fn engine_lua_gettop;
 static lua_settop_fn engine_lua_settop;
@@ -77,6 +78,29 @@ static lua_createtable_fn engine_lua_createtable;
 static lua_pushvalue_fn engine_lua_pushvalue;
 static lua_setglobal_fn engine_lua_setglobal;
 static luaL_traceback_fn engine_luaL_traceback;
+
+static int hooked_sdl_poll_event(void *event) {
+	int result = SO_CONTINUE(int, sdl_poll_event_hook, event);
+	if (result && event != NULL) {
+		uint32_t type = *(uint32_t *)event;
+		if (type == 0x302 || type == 0x303) {
+			const char *text = (const char *)event + 12;
+			bg2v_log_printf(
+				"[BG2V][SDL] polled text event type=0x%x text=%s\n",
+				(unsigned int)type, text);
+		}
+	}
+	return result;
+}
+
+static void install_sdl_input_diagnostics(void) {
+	uintptr_t poll_event = so_symbol(&so_mod, "SDL_PollEvent");
+	if (poll_event == 0) {
+		fatal_error("BG2V could not install SDL input diagnostics.");
+	}
+	sdl_poll_event_hook =
+		hook_addr(poll_event, (uintptr_t)&hooked_sdl_poll_event);
+}
 
 /*
  * The Android Java bootstrap normally creates this table before
@@ -303,6 +327,7 @@ void kuser_patch(void) {
 void so_patch(void) {
 	kuser_patch();
 	install_lua_diagnostics();
+	install_sdl_input_diagnostics();
 	// Sample hook with symbol name
 	// hook_addr((uintptr_t)so_symbol(&so_mod, "_ZN6glitch2os7Printer5printEPKcz"), (uintptr_t)&hookedFunction);
 	// Or with offset

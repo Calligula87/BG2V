@@ -44,6 +44,8 @@ typedef void (*bg2_sdl_native_mouse_fn)(
 typedef void (*bg2_sdl_native_commit_text_fn)(
     JNIEnv *env, jobject input_connection, jstring text, jint new_cursor);
 typedef int (*bg2_sdl_send_keyboard_text_fn)(const char *text);
+typedef int (*bg2_sdl_send_editing_text_fn)(
+    const char *text, int start, int length);
 typedef void (*bg2_sdl_start_text_input_fn)(void);
 
 enum bg2_bootstrap_state {
@@ -63,6 +65,7 @@ static bg2_sdl_native_surface_fn SDLActivity_onNativeSurfaceChanged;
 static bg2_sdl_native_mouse_fn SDLActivity_onNativeMouse;
 static bg2_sdl_native_commit_text_fn SDLInputConnection_nativeCommitText;
 static bg2_sdl_send_keyboard_text_fn SDL_SendKeyboardText_internal;
+static bg2_sdl_send_editing_text_fn SDL_SendEditingText_internal;
 static bg2_sdl_start_text_input_fn SDL_StartTextInput;
 static float pointer_x = 480.0f;
 static float pointer_y = 272.0f;
@@ -123,12 +126,15 @@ static void require_sdl_input_bridges(void) {
         (uintptr_t)SDLInputConnection_nativeCommitText & ~(uintptr_t)1;
     SDL_SendKeyboardText_internal =
         (bg2_sdl_send_keyboard_text_fn)(commit_entry - 0x266c4);
+    SDL_SendEditingText_internal =
+        (bg2_sdl_send_editing_text_fn)(commit_entry - 0x26630);
 
     if (!SDLActivity_onNativeKeyDown || !SDLActivity_onNativeKeyUp ||
         !SDLActivity_onNativeTouch || !SDLActivity_onNativeResize ||
         !SDLActivity_onNativeSurfaceChanged || !SDLActivity_onNativeMouse ||
         !SDLInputConnection_nativeCommitText ||
-        !SDL_SendKeyboardText_internal || !SDL_StartTextInput) {
+        !SDL_SendKeyboardText_internal || !SDL_SendEditingText_internal ||
+        !SDL_StartTextInput) {
         fatal_error("BG2V could not resolve SDL's native activity callbacks.");
     }
     bg2v_log_printf("[BG2V] SDL input and surface bridges resolved\n");
@@ -207,6 +213,7 @@ int main() {
     int elapsed_ms = 0;
     int milestone_logged = 0;
     int ime_active = 0;
+    char ime_last_text[32] = "";
     for (;;) {
         if (bootstrap_state == BG2_BOOTSTRAP_RETURNED) {
             fatal_error("SDLActivity.nativeInit returned %d.\n\n"
@@ -225,6 +232,7 @@ int main() {
             int result = init_ime_dialog("Character name", "");
             if (result >= 0) {
                 ime_active = 1;
+                ime_last_text[0] = '\0';
                 bg2v_log_printf("[BG2V][IME] Vita keyboard opened\n");
             } else {
                 bg2v_log_printf(
@@ -233,6 +241,18 @@ int main() {
         }
 
         if (ime_active) {
+            const char *live_text = get_ime_dialog_live_text();
+            if (strcmp(live_text, ime_last_text) != 0) {
+                SDL_StartTextInput();
+                int editing_queued =
+                    SDL_SendEditingText_internal(live_text, 0, 0);
+                strncpy(ime_last_text, live_text, sizeof(ime_last_text) - 1);
+                ime_last_text[sizeof(ime_last_text) - 1] = '\0';
+                bg2v_log_printf(
+                    "[BG2V][IME] composing %u bytes, SDL queued=%d\n",
+                    (unsigned int)strlen(live_text), editing_queued);
+            }
+
             char *text = get_ime_dialog_result();
             if (text != NULL) {
                 int queued = 0;
@@ -243,19 +263,8 @@ int main() {
                      * final committed string.
                      */
                     SDL_StartTextInput();
+                    SDL_SendEditingText_internal(text, 0, 0);
                     queued = SDL_SendKeyboardText_internal(text);
-                    if (queued) {
-                        /*
-                         * Vita's IME confirms with its own Enter button rather
-                         * than an Android KeyEvent. Forward that confirmation
-                         * after the SDL_TEXTINPUT event so BG2 finalizes the
-                         * active edit control.
-                         */
-                        SDLActivity_onNativeKeyDown(
-                            &jni, (jclass)0x42424242, AKEYCODE_ENTER);
-                        SDLActivity_onNativeKeyUp(
-                            &jni, (jclass)0x42424242, AKEYCODE_ENTER);
-                    }
                 }
                 bg2v_log_printf(
                     "[BG2V][IME] keyboard closed, committed %u bytes, "
