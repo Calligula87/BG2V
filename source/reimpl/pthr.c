@@ -19,8 +19,6 @@
 #include "utils/utils.h"
 #include "utils/logger.h"
 
-#define PTHR_MAX_OBJECTS 1024
-
 #define BIONIC_PTHREAD_COND_INITIALIZER              0
 #define BIONIC_PTHREAD_MUTEX_INITIALIZER             0
 #define BIONIC_PTHREAD_RECURSIVE_MUTEX_INITIALIZER   0x4000
@@ -39,62 +37,15 @@ enum {
 
 #define PTHR_INLINE static inline __attribute__((always_inline))
 
-void * initializedObjects[PTHR_MAX_OBJECTS] = {0};
-static SceKernelLwMutexWork pthr_mutex;
-static volatile short int pthr_mutex_inited = 0;
-
-#define PTHR_LOCK \
-    if (!pthr_mutex_inited) { \
-        int ret = sceKernelCreateLwMutex(&pthr_mutex, "log_lock", 0, 0, NULL); \
-        if (ret < 0) { \
-            sceClibPrintf("Error: failed to create pthr mutex: 0x%x\n", ret); \
-            return 0; \
-        } \
-        pthr_mutex_inited = 1; \
-    } \
-    sceKernelLockLwMutex(&pthr_mutex, 1, NULL);
-
-#define PTHR_UNLOCK \
-    if (pthr_mutex_inited) { \
-        sceKernelUnlockLwMutex(&pthr_mutex, 1); \
-    }
-
-int isObjectInitialized(const void * mut) {
-    PTHR_LOCK
-    for (int i = 0; i < PTHR_MAX_OBJECTS; ++i) {
-        if (initializedObjects[i] == mut) {
-            PTHR_UNLOCK
-            return 1;
-        }
-    }
-    PTHR_UNLOCK
-    return 0;
-}
-
-int rememberObject(void * mut) {
-    PTHR_LOCK
-    for (int i = 0; i < PTHR_MAX_OBJECTS; ++i) {
-        if (initializedObjects[i] == 0) {
-            initializedObjects[i] = mut;
-            PTHR_UNLOCK
-            return 1;
-        }
-    }
-    PTHR_UNLOCK
-    return 0;
-}
-
-int forgetObject(const void * mut) {
-    PTHR_LOCK
-    for (int i = 0; i < PTHR_MAX_OBJECTS; ++i) {
-        if (initializedObjects[i] == mut) {
-            initializedObjects[i] = 0;
-            PTHR_UNLOCK
-            return 1;
-        }
-    }
-    PTHR_UNLOCK
-    return 0;
+/*
+ * A Bionic mutex/condition is one 32-bit word in this Android build. Static
+ * initializers are small constants (0, 0x4000, 0x8000); after bridging, that
+ * word contains a real Vita pthread pointer. Checking that word directly
+ * avoids taking a second lock and scanning a 1024-entry registry on every
+ * game mutex operation. Movie decoding is particularly lock-heavy.
+ */
+PTHR_INLINE int _bionic_object_is_initialized(const void *object) {
+    return (uintptr_t)*(void * const *)object >= 0x10000u;
 }
 
 // null check for `attr` must be performed before this
@@ -111,7 +62,7 @@ PTHR_INLINE int _attr_t_static_init(pthread_attr_t_bionic * attr) {
 PTHR_INLINE int _mutex_t_static_init(pthread_mutex_t_bionic * mutex, const pthread_mutexattr_t * attr) {
     int ret = 0, kind = PTHREAD_MUTEX_NORMAL;
 
-    if (isObjectInitialized(mutex)) {
+    if (_bionic_object_is_initialized(mutex)) {
         //logv_debug("mutex already initialized: %p", mutex);
         return ret;
     }
@@ -134,9 +85,7 @@ PTHR_INLINE int _mutex_t_static_init(pthread_mutex_t_bionic * mutex, const pthre
     ret = pthread_mutex_init(mutex->real_ptr, &mutattr);
     pthread_mutexattr_destroy(&mutattr);
 
-    if (ret == 0) {
-        rememberObject(mutex);
-    } else {
+    if (ret != 0) {
         l_error("mutex initialization for %p has failed", mutex);
     }
 
@@ -147,7 +96,7 @@ PTHR_INLINE int _mutex_t_static_init(pthread_mutex_t_bionic * mutex, const pthre
 PTHR_INLINE int _cond_t_static_init(pthread_cond_t_bionic * cond, const pthread_condattr_t * attr) {
     int ret = 0;
 
-    if (isObjectInitialized(cond)) {
+    if (_bionic_object_is_initialized(cond)) {
         //logv_debug("cond already initialized: %p", cond);
         return ret;
     }
@@ -158,9 +107,7 @@ PTHR_INLINE int _cond_t_static_init(pthread_cond_t_bionic * cond, const pthread_
 
     ret = pthread_cond_init(cond->real_ptr, attr);
 
-    if (ret == 0) {
-        rememberObject(cond);
-    } else {
+    if (ret != 0) {
         l_error("cond initialization for %p has failed", cond);
     }
 
@@ -214,7 +161,7 @@ int pthread_mutex_init_soloader(pthread_mutex_t_bionic *uid, const pthread_mutex
 int pthread_mutex_destroy_soloader(pthread_mutex_t_bionic *mutex)
 {
     if (!mutex) return 0;
-    forgetObject(mutex);
+    if (!_bionic_object_is_initialized(mutex)) return 0;
     int ret = pthread_mutex_destroy(mutex->real_ptr);
     if (mutex->real_ptr) free(mutex->real_ptr);
     mutex->real_ptr = 0x0;
@@ -270,7 +217,7 @@ int pthread_cond_init_soloader(pthread_cond_t_bionic *cond,
 int pthread_cond_destroy_soloader(pthread_cond_t_bionic *cond)
 {
     if (!cond) return 0;
-    forgetObject(cond);
+    if (!_bionic_object_is_initialized(cond)) return 0;
     int ret = pthread_cond_destroy(cond->real_ptr);
     if (cond->real_ptr) free(cond->real_ptr);
     cond->real_ptr = 0x0;

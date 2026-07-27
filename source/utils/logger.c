@@ -32,10 +32,15 @@ static char buffer_a[2048];
 // Buffer B is used to compile the final log using the updated format string.
 static char buffer_b[2048];
 static char file_buffer[2048];
+static SceUID log_fd = -1;
 
 #define BG2V_LOG_PATH DATA_PATH "bootstrap.log"
 
 void bg2v_log_reset(void) {
+    if (log_fd >= 0) {
+        sceIoClose(log_fd);
+        log_fd = -1;
+    }
     sceIoRemove(BG2V_LOG_PATH);
     bg2v_log_printf("BG2V SDL bootstrap diagnostic log\n");
 }
@@ -57,11 +62,18 @@ int bg2v_log_printf(const char *fmt, ...) {
     }
 
     sceClibPrintf("%s", file_buffer);
-    SceUID fd = sceIoOpen(
-        BG2V_LOG_PATH, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND, 0666);
-    if (fd >= 0) {
-        sceIoWrite(fd, file_buffer, write_length);
-        sceIoClose(fd);
+    /*
+     * Resource discovery emits thousands of short diagnostics. Opening and
+     * closing the file for every line noticeably delayed startup and could
+     * starve movie/audio work. Keep one append descriptor instead; sceIoWrite
+     * still makes each completed line available to FTP diagnostics.
+     */
+    if (log_fd < 0) {
+        log_fd = sceIoOpen(
+            BG2V_LOG_PATH, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND, 0666);
+    }
+    if (log_fd >= 0) {
+        sceIoWrite(log_fd, file_buffer, write_length);
     }
     return length;
 }

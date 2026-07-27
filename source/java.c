@@ -26,7 +26,32 @@ enum bg2_java_method_id {
 	METHOD_IS_WIFI_ON,
 	METHOD_WRITE_TO_LOG,
 	METHOD_GET_LANGUAGE_STRING,
+	METHOD_SHOW_TEXT_INPUT,
 };
+
+static volatile int text_input_requested;
+static volatile int text_input_x;
+static volatile int text_input_y;
+static volatile int text_input_w;
+static volatile int text_input_h;
+
+int bg2v_take_text_input_request(void) {
+	return __sync_bool_compare_and_swap(&text_input_requested, 1, 0);
+}
+
+static jboolean showTextInput(jmethodID id, va_list args) {
+	(void)id;
+	text_input_x = va_arg(args, jint);
+	text_input_y = va_arg(args, jint);
+	text_input_w = va_arg(args, jint);
+	text_input_h = va_arg(args, jint);
+	__sync_synchronize();
+	text_input_requested = 1;
+	bg2v_log_printf(
+		"[BG2V][JNI] showTextInput rect=%d,%d %dx%d\n",
+		text_input_x, text_input_y, text_input_w, text_input_h);
+	return JNI_TRUE;
+}
 
 static jobject getNativeSurface(jmethodID id, va_list args) {
 	(void)id;
@@ -206,12 +231,14 @@ NameToMethodID nameToMethodId[] = {
 	{ METHOD_IS_WIFI_ON, "IsWiFiOn", METHOD_TYPE_BOOLEAN },
 	{ METHOD_WRITE_TO_LOG, "writeToLog", METHOD_TYPE_BOOLEAN },
 	{ METHOD_GET_LANGUAGE_STRING, "getLanguageString", METHOD_TYPE_OBJECT },
+	{ METHOD_SHOW_TEXT_INPUT, "showTextInput", METHOD_TYPE_BOOLEAN },
 };
 
 MethodsBoolean methodsBoolean[] = {
 	{ METHOD_SEND_MESSAGE, sendMessage },
 	{ METHOD_IS_WIFI_ON, isWiFiOn },
 	{ METHOD_WRITE_TO_LOG, writeToLog },
+	{ METHOD_SHOW_TEXT_INPUT, showTextInput },
 };
 MethodsByte methodsByte[] = {};
 MethodsChar methodsChar[] = {};

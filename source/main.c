@@ -4,6 +4,7 @@
 #include "utils/logger.h"
 
 #include <psp2/kernel/threadmgr.h>
+#include <string.h>
 
 #include <falso_jni/FalsoJNI.h>
 #include <falso_jni/FalsoJNI_ImplBridge.h>
@@ -37,6 +38,13 @@ typedef void (*bg2_sdl_native_resize_fn)(
     jint format, jfloat refresh_rate);
 typedef void (*bg2_sdl_native_surface_fn)(
     JNIEnv *env, jclass activity_class);
+typedef void (*bg2_sdl_native_mouse_fn)(
+    JNIEnv *env, jclass activity_class, jint button, jint action,
+    jfloat x, jfloat y);
+typedef void (*bg2_sdl_native_commit_text_fn)(
+    JNIEnv *env, jobject input_connection, jstring text, jint new_cursor);
+typedef void (*bg2_sdl_native_keyboard_focus_lost_fn)(
+    JNIEnv *env, jclass activity_class);
 
 enum bg2_bootstrap_state {
     BG2_BOOTSTRAP_NOT_STARTED = 0,
@@ -52,6 +60,14 @@ static bg2_sdl_native_key_fn SDLActivity_onNativeKeyUp;
 static bg2_sdl_native_touch_fn SDLActivity_onNativeTouch;
 static bg2_sdl_native_resize_fn SDLActivity_onNativeResize;
 static bg2_sdl_native_surface_fn SDLActivity_onNativeSurfaceChanged;
+static bg2_sdl_native_mouse_fn SDLActivity_onNativeMouse;
+static bg2_sdl_native_commit_text_fn SDLInputConnection_nativeCommitText;
+static bg2_sdl_native_keyboard_focus_lost_fn
+    SDLActivity_onNativeKeyboardFocusLost;
+static float pointer_x = 480.0f;
+static float pointer_y = 272.0f;
+
+extern int bg2v_take_text_input_request(void);
 
 static bg2_jni_on_load_fn require_jni_on_load(void) {
     bg2_jni_on_load_fn entry =
@@ -86,10 +102,22 @@ static void require_sdl_input_bridges(void) {
         (bg2_sdl_native_surface_fn)so_symbol(
             &so_mod,
             "Java_org_libsdl_app_SDLActivity_onNativeSurfaceChanged");
+    SDLActivity_onNativeMouse = (bg2_sdl_native_mouse_fn)so_symbol(
+        &so_mod, "Java_org_libsdl_app_SDLActivity_onNativeMouse");
+    SDLInputConnection_nativeCommitText =
+        (bg2_sdl_native_commit_text_fn)so_symbol(
+            &so_mod,
+            "Java_org_libsdl_app_SDLInputConnection_nativeCommitText");
+    SDLActivity_onNativeKeyboardFocusLost =
+        (bg2_sdl_native_keyboard_focus_lost_fn)so_symbol(
+            &so_mod,
+            "Java_org_libsdl_app_SDLActivity_onNativeKeyboardFocusLost");
 
     if (!SDLActivity_onNativeKeyDown || !SDLActivity_onNativeKeyUp ||
         !SDLActivity_onNativeTouch || !SDLActivity_onNativeResize ||
-        !SDLActivity_onNativeSurfaceChanged) {
+        !SDLActivity_onNativeSurfaceChanged || !SDLActivity_onNativeMouse ||
+        !SDLInputConnection_nativeCommitText ||
+        !SDLActivity_onNativeKeyboardFocusLost) {
         fatal_error("BG2V could not resolve SDL's native activity callbacks.");
     }
     bg2v_log_printf("[BG2V] SDL input and surface bridges resolved\n");
@@ -167,6 +195,7 @@ int main() {
 
     int elapsed_ms = 0;
     int milestone_logged = 0;
+    int ime_active = 0;
     for (;;) {
         if (bootstrap_state == BG2_BOOTSTRAP_RETURNED) {
             fatal_error("SDLActivity.nativeInit returned %d.\n\n"
@@ -181,7 +210,35 @@ int main() {
                 milestone_logged = 1;
             }
         }
-        controls_poll();
+        if (!ime_active && bg2v_take_text_input_request()) {
+            int result = init_ime_dialog("Character name", "");
+            if (result >= 0) {
+                ime_active = 1;
+                bg2v_log_printf("[BG2V][IME] Vita keyboard opened\n");
+            } else {
+                bg2v_log_printf(
+                    "[BG2V][IME] keyboard open failed: 0x%08x\n", result);
+            }
+        }
+
+        if (ime_active) {
+            char *text = get_ime_dialog_result();
+            if (text != NULL) {
+                jstring committed = jni->NewStringUTF(&jni, text);
+                if (committed != NULL && text[0] != '\0') {
+                    SDLInputConnection_nativeCommitText(
+                        &jni, (jobject)0x42420005, committed, 1);
+                }
+                SDLActivity_onNativeKeyboardFocusLost(
+                    &jni, (jclass)0x42424242);
+                bg2v_log_printf(
+                    "[BG2V][IME] keyboard closed, committed %u bytes\n",
+                    (unsigned int)strlen(text));
+                ime_active = 0;
+            }
+        } else {
+            controls_poll();
+        }
         sceKernelDelayThread(16 * 1000);
     }
 #else
@@ -246,6 +303,28 @@ void controls_handler_touch(int32_t id, float x, float y, ControlsAction action)
 }
 
 void controls_handler_analog(ControlsStickId which, float x, float y, ControlsAction action) {
-    // Call into the .so here
+    if (which != CONTROLS_STICK_LEFT || action == CONTROLS_ACTION_UP)
+        return;
+    if (x == 0.0f && y == 0.0f)
+        return;
+
+    pointer_x += x * 9.0f;
+    pointer_y += y * 9.0f;
+    if (pointer_x < 0.0f) pointer_x = 0.0f;
+    if (pointer_y < 0.0f) pointer_y = 0.0f;
+    if (pointer_x > 959.0f) pointer_x = 959.0f;
+    if (pointer_y > 543.0f) pointer_y = 543.0f;
+
+    /* MotionEvent.ACTION_HOVER_MOVE */
+    SDLActivity_onNativeMouse(
+        &jni, (jclass)0x42424242, 0, 7, pointer_x, pointer_y);
+}
+
+void controls_handler_pointer_button(int32_t button, ControlsAction action) {
+    jint android_action =
+        action == CONTROLS_ACTION_DOWN ? 0 : 1; /* ACTION_DOWN / ACTION_UP */
+    SDLActivity_onNativeMouse(
+        &jni, (jclass)0x42424242, button, android_action,
+        pointer_x, pointer_y);
 }
 #endif

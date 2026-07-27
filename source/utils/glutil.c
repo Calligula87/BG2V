@@ -37,11 +37,23 @@ void gl_preload() {
 }
 
 void gl_init() {
-    vglInitExtended(0, 960, 544, 6 * 1024 * 1024, SCE_GXM_MULTISAMPLE_4X);
+    /*
+     * BG2 renders at the Vita's native resolution and performs full-screen
+     * texture uploads for movies. 4x MSAA multiplies that bandwidth without
+     * helping the pre-rendered video, so keep the default framebuffer
+     * single-sampled.
+     */
+    vglInitExtended(
+        0, 960, 544, 6 * 1024 * 1024, SCE_GXM_MULTISAMPLE_NONE);
 }
 
 void gl_swap() {
-    vglSwapBuffers(GL_FALSE);
+    /*
+     * GL_TRUE lets VitaGL composite a system common dialog when the Vita IME
+     * keyboard is active. With no dialog open this follows the normal swap
+     * path.
+     */
+    vglSwapBuffers(GL_TRUE);
 }
 
 /*

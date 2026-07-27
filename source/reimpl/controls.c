@@ -110,9 +110,7 @@ static ButtonMapping mapping[] = {
         { SCE_CTRL_DOWN,      AKEYCODE_DPAD_DOWN },
         { SCE_CTRL_LEFT,      AKEYCODE_DPAD_LEFT },
         { SCE_CTRL_RIGHT,     AKEYCODE_DPAD_RIGHT },
-        { SCE_CTRL_CROSS,     AKEYCODE_ENTER },
         { SCE_CTRL_CIRCLE,    AKEYCODE_BACK },
-        { SCE_CTRL_SQUARE,    AKEYCODE_SPACE },
         { SCE_CTRL_TRIANGLE,  AKEYCODE_ESCAPE },
         { SCE_CTRL_L1,        AKEYCODE_PAGE_UP },
         { SCE_CTRL_R1,        AKEYCODE_PAGE_DOWN },
@@ -136,6 +134,20 @@ void poll_pad() {
     current_buttons = pad.buttons;
     pressed_buttons = current_buttons & ~old_buttons;
     released_buttons = ~current_buttons & old_buttons;
+
+    /*
+     * BG2's Android interface is touch/mouse-first. Treat Cross and Square as
+     * primary/secondary mouse buttons at the left-stick cursor instead of
+     * sending keyboard Enter/Space, which the UI mostly ignores.
+     */
+    if (pressed_buttons & SCE_CTRL_CROSS)
+        controls_handler_pointer_button(1, CONTROLS_ACTION_DOWN);
+    if (released_buttons & SCE_CTRL_CROSS)
+        controls_handler_pointer_button(1, CONTROLS_ACTION_UP);
+    if (pressed_buttons & SCE_CTRL_SQUARE)
+        controls_handler_pointer_button(2, CONTROLS_ACTION_DOWN);
+    if (released_buttons & SCE_CTRL_SQUARE)
+        controls_handler_pointer_button(2, CONTROLS_ACTION_UP);
 
     for (int i = 0; i < sizeof(mapping) / sizeof(ButtonMapping); i++) {
         if (pressed_buttons & mapping[i].sce_button) {
