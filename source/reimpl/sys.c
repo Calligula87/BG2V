@@ -137,6 +137,17 @@ int __atomic_cmpxchg(int old_value, int new_value, volatile int* ptr) {
 }
 
 char * getenv_soloader(const char * var) {
+    /*
+     * libvpx otherwise relies on Android's runtime CPU probing. Advertise
+     * ARMv7 EDSP/media/NEON explicitly so its VP8 decoder consistently picks
+     * the optimized routines on the Vita's Cortex-A9.
+     */
+    if (strcmp(var, "VPX_SIMD_CAPS") == 0) {
+        return "7";
+    }
+    if (strcmp(var, "VPX_SIMD_CAPS_MASK") == 0) {
+        return NULL;
+    }
     l_warn("getenv(\"%s\"): not implemented.", var);
     return NULL;
 }

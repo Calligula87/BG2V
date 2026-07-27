@@ -43,8 +43,8 @@ typedef void (*bg2_sdl_native_mouse_fn)(
     jfloat x, jfloat y);
 typedef void (*bg2_sdl_native_commit_text_fn)(
     JNIEnv *env, jobject input_connection, jstring text, jint new_cursor);
-typedef void (*bg2_sdl_native_keyboard_focus_lost_fn)(
-    JNIEnv *env, jclass activity_class);
+typedef int (*bg2_sdl_send_keyboard_text_fn)(const char *text);
+typedef void (*bg2_sdl_start_text_input_fn)(void);
 
 enum bg2_bootstrap_state {
     BG2_BOOTSTRAP_NOT_STARTED = 0,
@@ -62,12 +62,13 @@ static bg2_sdl_native_resize_fn SDLActivity_onNativeResize;
 static bg2_sdl_native_surface_fn SDLActivity_onNativeSurfaceChanged;
 static bg2_sdl_native_mouse_fn SDLActivity_onNativeMouse;
 static bg2_sdl_native_commit_text_fn SDLInputConnection_nativeCommitText;
-static bg2_sdl_native_keyboard_focus_lost_fn
-    SDLActivity_onNativeKeyboardFocusLost;
+static bg2_sdl_send_keyboard_text_fn SDL_SendKeyboardText_internal;
+static bg2_sdl_start_text_input_fn SDL_StartTextInput;
 static float pointer_x = 480.0f;
 static float pointer_y = 272.0f;
 
 extern int bg2v_take_text_input_request(void);
+extern void bg2v_finish_text_input(void);
 
 static bg2_jni_on_load_fn require_jni_on_load(void) {
     bg2_jni_on_load_fn entry =
@@ -108,16 +109,26 @@ static void require_sdl_input_bridges(void) {
         (bg2_sdl_native_commit_text_fn)so_symbol(
             &so_mod,
             "Java_org_libsdl_app_SDLInputConnection_nativeCommitText");
-    SDLActivity_onNativeKeyboardFocusLost =
-        (bg2_sdl_native_keyboard_focus_lost_fn)so_symbol(
-            &so_mod,
-            "Java_org_libsdl_app_SDLActivity_onNativeKeyboardFocusLost");
+    SDL_StartTextInput = (bg2_sdl_start_text_input_fn)so_symbol(
+        &so_mod, "SDL_StartTextInput");
+
+    /*
+     * The bundled SDL keeps SDL_SendKeyboardText private. Its JNI commit
+     * wrapper is exported and calls that helper at a stable relative offset
+     * in BG2EE 2.6.6.13. Calling the helper directly returns whether SDL
+     * actually queued the text event, which makes Vita IME delivery
+     * observable and avoids a second fake-JNI string conversion.
+     */
+    uintptr_t commit_entry =
+        (uintptr_t)SDLInputConnection_nativeCommitText & ~(uintptr_t)1;
+    SDL_SendKeyboardText_internal =
+        (bg2_sdl_send_keyboard_text_fn)(commit_entry - 0x266c4);
 
     if (!SDLActivity_onNativeKeyDown || !SDLActivity_onNativeKeyUp ||
         !SDLActivity_onNativeTouch || !SDLActivity_onNativeResize ||
         !SDLActivity_onNativeSurfaceChanged || !SDLActivity_onNativeMouse ||
         !SDLInputConnection_nativeCommitText ||
-        !SDLActivity_onNativeKeyboardFocusLost) {
+        !SDL_SendKeyboardText_internal || !SDL_StartTextInput) {
         fatal_error("BG2V could not resolve SDL's native activity callbacks.");
     }
     bg2v_log_printf("[BG2V] SDL input and surface bridges resolved\n");
@@ -224,16 +235,33 @@ int main() {
         if (ime_active) {
             char *text = get_ime_dialog_result();
             if (text != NULL) {
-                jstring committed = jni->NewStringUTF(&jni, text);
-                if (committed != NULL && text[0] != '\0') {
-                    SDLInputConnection_nativeCommitText(
-                        &jni, (jobject)0x42420005, committed, 1);
+                int queued = 0;
+                if (text[0] != '\0') {
+                    /*
+                     * BG2 may stop Android text input while the system IME is
+                     * still open. Reactivate it immediately before queuing the
+                     * final committed string.
+                     */
+                    SDL_StartTextInput();
+                    queued = SDL_SendKeyboardText_internal(text);
+                    if (queued) {
+                        /*
+                         * Vita's IME confirms with its own Enter button rather
+                         * than an Android KeyEvent. Forward that confirmation
+                         * after the SDL_TEXTINPUT event so BG2 finalizes the
+                         * active edit control.
+                         */
+                        SDLActivity_onNativeKeyDown(
+                            &jni, (jclass)0x42424242, AKEYCODE_ENTER);
+                        SDLActivity_onNativeKeyUp(
+                            &jni, (jclass)0x42424242, AKEYCODE_ENTER);
+                    }
                 }
-                SDLActivity_onNativeKeyboardFocusLost(
-                    &jni, (jclass)0x42424242);
                 bg2v_log_printf(
-                    "[BG2V][IME] keyboard closed, committed %u bytes\n",
-                    (unsigned int)strlen(text));
+                    "[BG2V][IME] keyboard closed, committed %u bytes, "
+                    "SDL queued=%d\n",
+                    (unsigned int)strlen(text), queued);
+                bg2v_finish_text_input();
                 ime_active = 0;
             }
         } else {
@@ -284,6 +312,7 @@ void controls_handler_key(int32_t keycode, ControlsAction action) {
 }
 
 void controls_handler_touch(int32_t id, float x, float y, ControlsAction action) {
+    gl_pointer_set(pointer_x, pointer_y, GL_FALSE);
     jint android_action;
     switch (action) {
     case CONTROLS_ACTION_DOWN:
@@ -314,6 +343,7 @@ void controls_handler_analog(ControlsStickId which, float x, float y, ControlsAc
     if (pointer_y < 0.0f) pointer_y = 0.0f;
     if (pointer_x > 959.0f) pointer_x = 959.0f;
     if (pointer_y > 543.0f) pointer_y = 543.0f;
+    gl_pointer_set(pointer_x, pointer_y, GL_TRUE);
 
     /* MotionEvent.ACTION_HOVER_MOVE */
     SDLActivity_onNativeMouse(
@@ -323,6 +353,8 @@ void controls_handler_analog(ControlsStickId which, float x, float y, ControlsAc
 void controls_handler_pointer_button(int32_t button, ControlsAction action) {
     jint android_action =
         action == CONTROLS_ACTION_DOWN ? 0 : 1; /* ACTION_DOWN / ACTION_UP */
+    SDLActivity_onNativeMouse(
+        &jni, (jclass)0x42424242, 0, 7, pointer_x, pointer_y);
     SDLActivity_onNativeMouse(
         &jni, (jclass)0x42424242, button, android_action,
         pointer_x, pointer_y);

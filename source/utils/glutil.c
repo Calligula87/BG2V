@@ -24,6 +24,69 @@ GLboolean skip_next_compile = GL_FALSE;
 char next_shader_fname[256];
 void load_shader(GLuint shader, const char * string, size_t length);
 
+static volatile int pointer_visible;
+static volatile int pointer_screen_x = 480;
+static volatile int pointer_screen_y = 272;
+
+void gl_pointer_set(float x, float y, GLboolean visible) {
+    pointer_screen_x = (int)x;
+    pointer_screen_y = (int)y;
+    __sync_synchronize();
+    pointer_visible = visible ? 1 : 0;
+}
+
+static void pointer_clear_rect(int x, int y, int width, int height,
+                               float red, float green, float blue) {
+    if (x < 0) {
+        width += x;
+        x = 0;
+    }
+    if (y < 0) {
+        height += y;
+        y = 0;
+    }
+    if (x + width > 960) width = 960 - x;
+    if (y + height > 544) height = 544 - y;
+    if (width <= 0 || height <= 0) return;
+
+    glScissor(x, y, width, height);
+    glClearColor(red, green, blue, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+}
+
+static void gl_draw_pointer(void) {
+    if (!pointer_visible) return;
+
+    GLint framebuffer = 0;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebuffer);
+    if (framebuffer != 0) return;
+
+    GLboolean had_scissor = glIsEnabled(GL_SCISSOR_TEST);
+    GLint old_scissor[4];
+    GLfloat old_clear[4];
+    GLboolean old_mask[4];
+    glGetIntegerv(GL_SCISSOR_BOX, old_scissor);
+    glGetFloatv(GL_COLOR_CLEAR_VALUE, old_clear);
+    glGetBooleanv(GL_COLOR_WRITEMASK, old_mask);
+
+    int x = pointer_screen_x;
+    int y = 543 - pointer_screen_y;
+    glEnable(GL_SCISSOR_TEST);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+    /* Black outline plus a bright cyan cross, readable on light/dark scenes. */
+    pointer_clear_rect(x - 7, y - 1, 15, 3, 0.0f, 0.0f, 0.0f);
+    pointer_clear_rect(x - 1, y - 7, 3, 15, 0.0f, 0.0f, 0.0f);
+    pointer_clear_rect(x - 5, y, 11, 1, 0.1f, 1.0f, 1.0f);
+    pointer_clear_rect(x, y - 5, 1, 11, 0.1f, 1.0f, 1.0f);
+
+    glColorMask(old_mask[0], old_mask[1], old_mask[2], old_mask[3]);
+    glClearColor(old_clear[0], old_clear[1], old_clear[2], old_clear[3]);
+    glScissor(old_scissor[0], old_scissor[1],
+              old_scissor[2], old_scissor[3]);
+    if (!had_scissor) glDisable(GL_SCISSOR_TEST);
+}
+
 void gl_preload() {
     if (!file_exists("ur0:/data/libshacccg.suprx")
         && !file_exists("ur0:/data/external/libshacccg.suprx")) {
@@ -74,6 +137,7 @@ EGLBoolean eglSwapBuffers_soloader(EGLDisplay display, EGLSurface surface) {
         bg2v_log_printf("[BG2V][EGL] swap #%u\n", swap_count);
     }
 
+    gl_draw_pointer();
     gl_swap();
     return EGL_TRUE;
 }

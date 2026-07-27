@@ -30,13 +30,23 @@ enum bg2_java_method_id {
 };
 
 static volatile int text_input_requested;
+static volatile int text_input_busy;
 static volatile int text_input_x;
 static volatile int text_input_y;
 static volatile int text_input_w;
 static volatile int text_input_h;
 
 int bg2v_take_text_input_request(void) {
-	return __sync_bool_compare_and_swap(&text_input_requested, 1, 0);
+	if (!__sync_bool_compare_and_swap(&text_input_requested, 1, 0)) {
+		return 0;
+	}
+	text_input_busy = 1;
+	return 1;
+}
+
+void bg2v_finish_text_input(void) {
+	__sync_synchronize();
+	text_input_busy = 0;
 }
 
 static jboolean showTextInput(jmethodID id, va_list args) {
@@ -45,8 +55,11 @@ static jboolean showTextInput(jmethodID id, va_list args) {
 	text_input_y = va_arg(args, jint);
 	text_input_w = va_arg(args, jint);
 	text_input_h = va_arg(args, jint);
-	__sync_synchronize();
-	text_input_requested = 1;
+	if (text_input_busy ||
+		!__sync_bool_compare_and_swap(&text_input_requested, 0, 1)) {
+		bg2v_log_printf("[BG2V][JNI] duplicate showTextInput suppressed\n");
+		return JNI_TRUE;
+	}
 	bg2v_log_printf(
 		"[BG2V][JNI] showTextInput rect=%d,%d %dx%d\n",
 		text_input_x, text_input_y, text_input_w, text_input_h);

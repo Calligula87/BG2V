@@ -27,6 +27,8 @@ void gl_preload();
 
 void gl_swap();
 
+void gl_pointer_set(float x, float y, GLboolean visible);
+
 EGLBoolean eglSwapBuffers_soloader(EGLDisplay display, EGLSurface surface);
 
 EGLBoolean eglSwapInterval_soloader(EGLDisplay display, EGLint interval);
