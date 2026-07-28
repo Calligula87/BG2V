@@ -69,6 +69,7 @@ static so_hook lua_loadbuffer_hook;
 static so_hook lua_loadfile_hook;
 static so_hook lua_throw_hook;
 static so_hook sdl_poll_event_hook;
+static so_hook vpx_dec_init_hook;
 static lua_tolstring_fn engine_lua_tolstring;
 static lua_gettop_fn engine_lua_gettop;
 static lua_settop_fn engine_lua_settop;
@@ -100,6 +101,51 @@ static void install_sdl_input_diagnostics(void) {
 	}
 	sdl_poll_event_hook =
 		hook_addr(poll_event, (uintptr_t)&hooked_sdl_poll_event);
+}
+
+/*
+ * libvpx's decoder configuration is copied during vpx_codec_dec_init_ver.
+ * Android devices normally request multiple worker threads for 720p VP8, but
+ * BG2's fallback path reaches the embedded decoder with zero/one. Vita has
+ * three CPU cores available to applications, so make all movie decoders use
+ * them while leaving the source dimensions and flags unchanged.
+ */
+typedef struct bg2_vpx_codec_dec_cfg {
+	unsigned int threads;
+	unsigned int width;
+	unsigned int height;
+} bg2_vpx_codec_dec_cfg;
+
+static int hooked_vpx_codec_dec_init_ver(
+	void *context, void *iface, const bg2_vpx_codec_dec_cfg *config,
+	unsigned long flags, int version) {
+	bg2_vpx_codec_dec_cfg forced = {0, 0, 0};
+	if (config != NULL) {
+		forced = *config;
+	}
+
+	unsigned int requested_threads = forced.threads;
+	if (forced.threads < 3) {
+		forced.threads = 3;
+	}
+	bg2v_log_printf(
+		"[BG2V][VPX] decoder init threads=%u -> %u size=%ux%u\n",
+		requested_threads, forced.threads, forced.width, forced.height);
+
+	return SO_CONTINUE(
+		int, vpx_dec_init_hook, context, iface, &forced, flags, version);
+}
+
+static void install_vpx_performance_patch(void) {
+	uintptr_t dec_init = so_symbol(&so_mod, "vpx_codec_dec_init_ver");
+	if (dec_init == 0) {
+		fatal_error("BG2V could not locate the embedded VP8 decoder.");
+	}
+	vpx_dec_init_hook =
+		hook_addr(dec_init, (uintptr_t)&hooked_vpx_codec_dec_init_ver);
+	bg2v_log_printf(
+		"[BG2V][VPX] multi-thread decoder hook installed at 0x%08x\n",
+		(unsigned int)dec_init);
 }
 
 /*
@@ -328,6 +374,7 @@ void so_patch(void) {
 	kuser_patch();
 	install_lua_diagnostics();
 	install_sdl_input_diagnostics();
+	install_vpx_performance_patch();
 	// Sample hook with symbol name
 	// hook_addr((uintptr_t)so_symbol(&so_mod, "_ZN6glitch2os7Printer5printEPKcz"), (uintptr_t)&hookedFunction);
 	// Or with offset

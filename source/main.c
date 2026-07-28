@@ -70,26 +70,33 @@ static bg2_sdl_start_text_input_fn SDL_StartTextInput;
 static float pointer_x = 480.0f;
 static float pointer_y = 272.0f;
 
+#define BG2V_NAME_FIELD_X 480.0f
+#define BG2V_NAME_FIELD_Y 215.0f
+
 extern int bg2v_take_text_input_request(void);
 extern void bg2v_finish_text_input(void);
 
 static void bg2v_refocus_text_field(void) {
     /*
      * Opening the Vita common-dialog IME makes BG2 stop SDL text input and
-     * release its edit-box focus. Replaying the activation click after the
-     * dialog has closed lets BG2 rebuild that state before we commit text.
-     * text_input_busy remains set, so the replayed click cannot open a second
-     * Vita keyboard.
+     * release its edit-box focus. The click which opened the name popup is on
+     * the left-hand NAME row, not the edit box created inside the popup. Click
+     * the known centre of that edit box after the dialog has closed. Keeping
+     * text_input_busy set suppresses the second Vita keyboard request.
      */
     SDLActivity_onNativeMouse(
-        &jni, (jclass)0x42424242, 0, 7, pointer_x, pointer_y);
+        &jni, (jclass)0x42424242, 0, 7,
+        BG2V_NAME_FIELD_X, BG2V_NAME_FIELD_Y);
     SDLActivity_onNativeMouse(
-        &jni, (jclass)0x42424242, 1, 0, pointer_x, pointer_y);
+        &jni, (jclass)0x42424242, 1, 0,
+        BG2V_NAME_FIELD_X, BG2V_NAME_FIELD_Y);
     SDLActivity_onNativeMouse(
-        &jni, (jclass)0x42424242, 1, 1, pointer_x, pointer_y);
+        &jni, (jclass)0x42424242, 1, 1,
+        BG2V_NAME_FIELD_X, BG2V_NAME_FIELD_Y);
     bg2v_log_printf(
-        "[BG2V][IME] replayed focus click at %.0f,%.0f\n",
-        pointer_x, pointer_y);
+        "[BG2V][IME] name popup opened at %.0f,%.0f; "
+        "focused edit box at %.0f,%.0f\n",
+        pointer_x, pointer_y, BG2V_NAME_FIELD_X, BG2V_NAME_FIELD_Y);
 }
 
 static bg2_jni_on_load_fn require_jni_on_load(void) {
@@ -293,19 +300,21 @@ int main() {
                 ime_delivery_phase = 2;
                 ime_delivery_delay = 12;
             } else {
-                int editing_queued;
                 int text_queued;
 
+                /*
+                 * A real SDLInputConnection.nativeCommitText call emits only
+                 * SDL_TEXTINPUT. Sending SDL_TEXTEDITING immediately before
+                 * it left Beamdog's edit control in composition mode.
+                 */
                 SDL_StartTextInput();
-                editing_queued = SDL_SendEditingText_internal(
-                    ime_pending_text, 0, 0);
                 text_queued =
                     SDL_SendKeyboardText_internal(ime_pending_text);
                 bg2v_log_printf(
-                    "[BG2V][IME] refocused commit of %u bytes, "
-                    "editing queued=%d, text queued=%d\n",
+                    "[BG2V][IME] refocused native-style commit of %u bytes, "
+                    "text queued=%d\n",
                     (unsigned int)strlen(ime_pending_text),
-                    editing_queued, text_queued);
+                    text_queued);
                 ime_pending_text[0] = '\0';
                 ime_delivery_phase = 0;
                 bg2v_finish_text_input();
