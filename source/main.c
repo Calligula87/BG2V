@@ -75,6 +75,7 @@ static float pointer_y = 272.0f;
 
 extern int bg2v_take_text_input_request(void);
 extern void bg2v_finish_text_input(void);
+extern void bg2v_queue_chargen_name(const char *name);
 
 static void bg2v_refocus_text_field(void) {
     /*
@@ -300,21 +301,13 @@ int main() {
                 ime_delivery_phase = 2;
                 ime_delivery_delay = 12;
             } else {
-                int text_queued;
-
                 /*
-                 * A real SDLInputConnection.nativeCommitText call emits only
-                 * SDL_TEXTINPUT. Sending SDL_TEXTEDITING immediately before
-                 * it left Beamdog's edit control in composition mode.
+                 * The engine polls SDL_TEXTINPUT but its UI edit widget does
+                 * not consume it in this Android-free bootstrap. Queue the
+                 * retained value for assignment to UI.MENU's charNameEdit
+                 * variable from the next Lua call on the engine thread.
                  */
-                SDL_StartTextInput();
-                text_queued =
-                    SDL_SendKeyboardText_internal(ime_pending_text);
-                bg2v_log_printf(
-                    "[BG2V][IME] refocused native-style commit of %u bytes, "
-                    "text queued=%d\n",
-                    (unsigned int)strlen(ime_pending_text),
-                    text_queued);
+                bg2v_queue_chargen_name(ime_pending_text);
                 ime_pending_text[0] = '\0';
                 ime_delivery_phase = 0;
                 bg2v_finish_text_input();

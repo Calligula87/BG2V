@@ -63,6 +63,32 @@ ux0:data/bg2v/libBaldursGate.so
 
 Do not use the ARM64 library. The audited target is ARM EABI5 soft-float.
 
+## Vita movie overrides
+
+The original 1280x720 VP8 startup movies exceed the Vita's practical software
+decoding budget. BG2V can load optimized copies from
+`ux0:data/bg2v/movies/`, while all original media remains in the user's own
+installation.
+
+With `ffmpeg` and `unzip` installed, prepare the confirmed 640x360, 15 fps
+startup set from your legally obtained patch OBB:
+
+```sh
+./tools/prepare_vita_movies.sh \
+  /path/to/patch.5826.com.beamdog.baldursgateIIenhancededition.obb \
+  ./artifacts/optimized-movies
+```
+
+Copy the generated `logo.wbm`, `intro.wbm`, and `intro15f.wbm` to:
+
+```text
+ux0:data/bg2v/movies/
+```
+
+The generated files contain copyrighted game media and must not be committed
+or redistributed. Additional movie filenames can be supplied after the output
+directory to optimize later cinematics with the same profile.
+
 ## Expected first result
 
 Success is a dialog saying that the loader milestone passed. A failure is also

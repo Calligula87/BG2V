@@ -60,7 +60,11 @@ typedef int (*lua_type_fn)(lua_State *state, int index);
 typedef void (*lua_createtable_fn)(lua_State *state, int array_count,
 								   int record_count);
 typedef void (*lua_pushvalue_fn)(lua_State *state, int index);
+typedef const char *(*lua_pushlstring_fn)(lua_State *state,
+										 const char *value, size_t length);
 typedef void (*lua_setglobal_fn)(lua_State *state, const char *name);
+typedef void (*lua_setfield_fn)(lua_State *state, int index,
+							   const char *name);
 typedef void (*luaL_traceback_fn)(lua_State *state, lua_State *source,
 								  const char *message, int level);
 
@@ -69,7 +73,6 @@ static so_hook lua_loadbuffer_hook;
 static so_hook lua_loadfile_hook;
 static so_hook lua_throw_hook;
 static so_hook sdl_poll_event_hook;
-static so_hook vpx_dec_init_hook;
 static lua_tolstring_fn engine_lua_tolstring;
 static lua_gettop_fn engine_lua_gettop;
 static lua_settop_fn engine_lua_settop;
@@ -77,8 +80,66 @@ static lua_getglobal_fn engine_lua_getglobal;
 static lua_type_fn engine_lua_type;
 static lua_createtable_fn engine_lua_createtable;
 static lua_pushvalue_fn engine_lua_pushvalue;
+static lua_pushlstring_fn engine_lua_pushlstring;
 static lua_setglobal_fn engine_lua_setglobal;
+static lua_setfield_fn engine_lua_setfield;
 static luaL_traceback_fn engine_luaL_traceback;
+static volatile int pending_chargen_name_ready;
+static char pending_chargen_name[21];
+
+void bg2v_queue_chargen_name(const char *name) {
+	if (name == NULL || name[0] == '\0') {
+		return;
+	}
+
+	strncpy(pending_chargen_name, name, sizeof(pending_chargen_name) - 1);
+	pending_chargen_name[sizeof(pending_chargen_name) - 1] = '\0';
+	__sync_synchronize();
+	pending_chargen_name_ready = 1;
+	bg2v_log_printf(
+		"[BG2V][IME] queued %u-byte name for Beamdog Lua UI\n",
+		(unsigned int)strlen(pending_chargen_name));
+}
+
+static void inject_pending_chargen_name(lua_State *state) {
+	if (!pending_chargen_name_ready) {
+		return;
+	}
+
+	__sync_synchronize();
+	char name[sizeof(pending_chargen_name)];
+	strncpy(name, pending_chargen_name, sizeof(name));
+	name[sizeof(name) - 1] = '\0';
+
+	int top = engine_lua_gettop(state);
+
+	/*
+	 * UI.MENU binds the CHARGEN_NAME edit control to charNameEdit.  Android
+	 * normally updates that Lua global through Beamdog's text-edit path, not
+	 * merely by leaving an SDL_TEXTINPUT event in SDL's queue.  Execute the
+	 * assignment from this Lua hook so it happens on the engine thread.
+	 */
+	engine_lua_pushlstring(state, name, strlen(name));
+	engine_lua_setglobal(state, "charNameEdit");
+
+	/*
+	 * Keep the chargen model synchronized too.  This makes the native
+	 * IsDoneButtonClickable/OnDoneButtonClick path see the same value as the
+	 * edit control without depending on another Android text callback.
+	 */
+	engine_lua_getglobal(state, "chargen");
+	if (engine_lua_type(state, -1) == 5) { /* LUA_TTABLE */
+		engine_lua_pushlstring(state, name, strlen(name));
+		engine_lua_setfield(state, -2, "name");
+	}
+	engine_lua_settop(state, top);
+
+	__sync_synchronize();
+	pending_chargen_name_ready = 0;
+	bg2v_log_printf(
+		"[BG2V][IME] injected character name '%s' into Beamdog Lua UI\n",
+		name);
+}
 
 static int hooked_sdl_poll_event(void *event) {
 	int result = SO_CONTINUE(int, sdl_poll_event_hook, event);
@@ -101,51 +162,6 @@ static void install_sdl_input_diagnostics(void) {
 	}
 	sdl_poll_event_hook =
 		hook_addr(poll_event, (uintptr_t)&hooked_sdl_poll_event);
-}
-
-/*
- * libvpx's decoder configuration is copied during vpx_codec_dec_init_ver.
- * Android devices normally request multiple worker threads for 720p VP8, but
- * BG2's fallback path reaches the embedded decoder with zero/one. Vita has
- * three CPU cores available to applications, so make all movie decoders use
- * them while leaving the source dimensions and flags unchanged.
- */
-typedef struct bg2_vpx_codec_dec_cfg {
-	unsigned int threads;
-	unsigned int width;
-	unsigned int height;
-} bg2_vpx_codec_dec_cfg;
-
-static int hooked_vpx_codec_dec_init_ver(
-	void *context, void *iface, const bg2_vpx_codec_dec_cfg *config,
-	unsigned long flags, int version) {
-	bg2_vpx_codec_dec_cfg forced = {0, 0, 0};
-	if (config != NULL) {
-		forced = *config;
-	}
-
-	unsigned int requested_threads = forced.threads;
-	if (forced.threads < 3) {
-		forced.threads = 3;
-	}
-	bg2v_log_printf(
-		"[BG2V][VPX] decoder init threads=%u -> %u size=%ux%u\n",
-		requested_threads, forced.threads, forced.width, forced.height);
-
-	return SO_CONTINUE(
-		int, vpx_dec_init_hook, context, iface, &forced, flags, version);
-}
-
-static void install_vpx_performance_patch(void) {
-	uintptr_t dec_init = so_symbol(&so_mod, "vpx_codec_dec_init_ver");
-	if (dec_init == 0) {
-		fatal_error("BG2V could not locate the embedded VP8 decoder.");
-	}
-	vpx_dec_init_hook =
-		hook_addr(dec_init, (uintptr_t)&hooked_vpx_codec_dec_init_ver);
-	bg2v_log_printf(
-		"[BG2V][VPX] multi-thread decoder hook installed at 0x%08x\n",
-		(unsigned int)dec_init);
 }
 
 /*
@@ -235,6 +251,7 @@ static int hooked_luaL_loadfilex(lua_State *state, const char *filename,
 static int hooked_lua_pcallk(lua_State *state, int nargs, int nresults,
 							 int errfunc, int ctx,
 							 lua_CFunction continuation) {
+	inject_pending_chargen_name(state);
 	int result = SO_CONTINUE(
 		int, lua_pcallk_hook, state, nargs, nresults, errfunc, ctx,
 		continuation);
@@ -267,8 +284,12 @@ static void install_lua_diagnostics(void) {
 		(lua_createtable_fn)so_symbol(&so_mod, "lua_createtable");
 	engine_lua_pushvalue =
 		(lua_pushvalue_fn)so_symbol(&so_mod, "lua_pushvalue");
+	engine_lua_pushlstring =
+		(lua_pushlstring_fn)so_symbol(&so_mod, "lua_pushlstring");
 	engine_lua_setglobal =
 		(lua_setglobal_fn)so_symbol(&so_mod, "lua_setglobal");
+	engine_lua_setfield =
+		(lua_setfield_fn)so_symbol(&so_mod, "lua_setfield");
 	engine_luaL_traceback =
 		(luaL_traceback_fn)so_symbol(&so_mod, "luaL_traceback");
 
@@ -276,7 +297,8 @@ static void install_lua_diagnostics(void) {
 		engine_lua_getglobal == NULL || getglobal_plt == 0 ||
 		engine_lua_tolstring == NULL || engine_lua_type == NULL ||
 		engine_lua_createtable == NULL || engine_lua_pushvalue == NULL ||
-		engine_lua_setglobal == NULL) {
+		engine_lua_pushlstring == NULL || engine_lua_setglobal == NULL ||
+		engine_lua_setfield == NULL) {
 		fatal_error("BG2V could not install Lua diagnostics.");
 	}
 
@@ -374,7 +396,6 @@ void so_patch(void) {
 	kuser_patch();
 	install_lua_diagnostics();
 	install_sdl_input_diagnostics();
-	install_vpx_performance_patch();
 	// Sample hook with symbol name
 	// hook_addr((uintptr_t)so_symbol(&so_mod, "_ZN6glitch2os7Printer5printEPKcz"), (uintptr_t)&hookedFunction);
 	// Or with offset
