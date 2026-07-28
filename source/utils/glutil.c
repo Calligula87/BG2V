@@ -132,9 +132,25 @@ EGLBoolean eglSwapBuffers_soloader(EGLDisplay display, EGLSurface surface) {
     (void)surface;
 
     static unsigned int swap_count;
+    static uint64_t timing_window_start_ms;
     ++swap_count;
-    if (swap_count <= 5 || (swap_count % 300) == 0) {
+    uint64_t now_ms = current_timestamp_ms();
+    if (swap_count == 1) {
+        timing_window_start_ms = now_ms;
+    }
+    if (swap_count <= 5) {
         bg2v_log_printf("[BG2V][EGL] swap #%u\n", swap_count);
+    } else if ((swap_count % 120) == 0) {
+        uint64_t elapsed_ms = now_ms - timing_window_start_ms;
+        unsigned int fps_x10 = elapsed_ms > 0
+            ? (unsigned int)(120ULL * 10000ULL / elapsed_ms)
+            : 0;
+        bg2v_log_printf(
+            "[BG2V][EGL] swap #%u: last 120 frames in %llu ms "
+            "(%u.%u fps)\n",
+            swap_count, (unsigned long long)elapsed_ms,
+            fps_x10 / 10, fps_x10 % 10);
+        timing_window_start_ms = now_ms;
     }
 
     gl_draw_pointer();

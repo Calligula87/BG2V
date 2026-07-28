@@ -73,6 +73,25 @@ static float pointer_y = 272.0f;
 extern int bg2v_take_text_input_request(void);
 extern void bg2v_finish_text_input(void);
 
+static void bg2v_refocus_text_field(void) {
+    /*
+     * Opening the Vita common-dialog IME makes BG2 stop SDL text input and
+     * release its edit-box focus. Replaying the activation click after the
+     * dialog has closed lets BG2 rebuild that state before we commit text.
+     * text_input_busy remains set, so the replayed click cannot open a second
+     * Vita keyboard.
+     */
+    SDLActivity_onNativeMouse(
+        &jni, (jclass)0x42424242, 0, 7, pointer_x, pointer_y);
+    SDLActivity_onNativeMouse(
+        &jni, (jclass)0x42424242, 1, 0, pointer_x, pointer_y);
+    SDLActivity_onNativeMouse(
+        &jni, (jclass)0x42424242, 1, 1, pointer_x, pointer_y);
+    bg2v_log_printf(
+        "[BG2V][IME] replayed focus click at %.0f,%.0f\n",
+        pointer_x, pointer_y);
+}
+
 static bg2_jni_on_load_fn require_jni_on_load(void) {
     bg2_jni_on_load_fn entry =
         (bg2_jni_on_load_fn)so_symbol(&so_mod, "JNI_OnLoad");
@@ -213,7 +232,9 @@ int main() {
     int elapsed_ms = 0;
     int milestone_logged = 0;
     int ime_active = 0;
-    char ime_last_text[32] = "";
+    int ime_delivery_phase = 0;
+    int ime_delivery_delay = 0;
+    char ime_pending_text[32] = "";
     for (;;) {
         if (bootstrap_state == BG2_BOOTSTRAP_RETURNED) {
             fatal_error("SDLActivity.nativeInit returned %d.\n\n"
@@ -228,50 +249,66 @@ int main() {
                 milestone_logged = 1;
             }
         }
-        if (!ime_active && bg2v_take_text_input_request()) {
+        if (!ime_active && ime_delivery_phase == 0 &&
+            bg2v_take_text_input_request()) {
             int result = init_ime_dialog("Character name", "");
             if (result >= 0) {
                 ime_active = 1;
-                ime_last_text[0] = '\0';
                 bg2v_log_printf("[BG2V][IME] Vita keyboard opened\n");
             } else {
                 bg2v_log_printf(
                     "[BG2V][IME] keyboard open failed: 0x%08x\n", result);
+                bg2v_finish_text_input();
             }
         }
 
         if (ime_active) {
-            const char *live_text = get_ime_dialog_live_text();
-            if (strcmp(live_text, ime_last_text) != 0) {
-                SDL_StartTextInput();
-                int editing_queued =
-                    SDL_SendEditingText_internal(live_text, 0, 0);
-                strncpy(ime_last_text, live_text, sizeof(ime_last_text) - 1);
-                ime_last_text[sizeof(ime_last_text) - 1] = '\0';
-                bg2v_log_printf(
-                    "[BG2V][IME] composing %u bytes, SDL queued=%d\n",
-                    (unsigned int)strlen(live_text), editing_queued);
-            }
-
             char *text = get_ime_dialog_result();
             if (text != NULL) {
-                int queued = 0;
-                if (text[0] != '\0') {
-                    /*
-                     * BG2 may stop Android text input while the system IME is
-                     * still open. Reactivate it immediately before queuing the
-                     * final committed string.
-                     */
-                    SDL_StartTextInput();
-                    SDL_SendEditingText_internal(text, 0, 0);
-                    queued = SDL_SendKeyboardText_internal(text);
-                }
+                strncpy(
+                    ime_pending_text, text, sizeof(ime_pending_text) - 1);
+                ime_pending_text[sizeof(ime_pending_text) - 1] = '\0';
                 bg2v_log_printf(
-                    "[BG2V][IME] keyboard closed, committed %u bytes, "
-                    "SDL queued=%d\n",
-                    (unsigned int)strlen(text), queued);
-                bg2v_finish_text_input();
+                    "[BG2V][IME] keyboard closed, retained %u bytes\n",
+                    (unsigned int)strlen(ime_pending_text));
                 ime_active = 0;
+
+                if (ime_pending_text[0] != '\0') {
+                    /*
+                     * Give the common dialog a few frames to leave, refocus
+                     * the field, then give BG2 time to consume the synthetic
+                     * click before committing the retained string.
+                     */
+                    ime_delivery_phase = 1;
+                    ime_delivery_delay = 4;
+                } else {
+                    bg2v_finish_text_input();
+                }
+            }
+        } else if (ime_delivery_phase != 0) {
+            if (ime_delivery_delay > 0) {
+                --ime_delivery_delay;
+            } else if (ime_delivery_phase == 1) {
+                bg2v_refocus_text_field();
+                ime_delivery_phase = 2;
+                ime_delivery_delay = 12;
+            } else {
+                int editing_queued;
+                int text_queued;
+
+                SDL_StartTextInput();
+                editing_queued = SDL_SendEditingText_internal(
+                    ime_pending_text, 0, 0);
+                text_queued =
+                    SDL_SendKeyboardText_internal(ime_pending_text);
+                bg2v_log_printf(
+                    "[BG2V][IME] refocused commit of %u bytes, "
+                    "editing queued=%d, text queued=%d\n",
+                    (unsigned int)strlen(ime_pending_text),
+                    editing_queued, text_queued);
+                ime_pending_text[0] = '\0';
+                ime_delivery_phase = 0;
+                bg2v_finish_text_input();
             }
         } else {
             controls_poll();
@@ -321,6 +358,12 @@ void controls_handler_key(int32_t keycode, ControlsAction action) {
 }
 
 void controls_handler_touch(int32_t id, float x, float y, ControlsAction action) {
+    /*
+     * Preserve the most recent touch location as well as analog-pointer
+     * location. The IME refocus sequence needs the exact box the user tapped.
+     */
+    pointer_x = x;
+    pointer_y = y;
     gl_pointer_set(pointer_x, pointer_y, GL_FALSE);
     jint android_action;
     switch (action) {
