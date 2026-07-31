@@ -16,7 +16,12 @@
 #include <falso_ndk/FalsoNDK.h>
 #endif
 
-int _newlib_heap_size_user = 256 * 1024 * 1024;
+/*
+ * The verified AREA060A ETC2 run used about 120 MiB of CPU heap and left at
+ * least 62 MiB free in vitaGL's 227 MiB pool. Reserve 176 MiB for the engine
+ * while retaining enough GPU-side memory for decoded area textures.
+ */
+int _newlib_heap_size_user = 176 * 1024 * 1024;
 
 #ifdef USE_SCELIBC_IO
 int sceLibcHeapSize = 4 * 1024 * 1024;

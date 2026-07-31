@@ -15,6 +15,8 @@
 
 #include <stdio.h>
 #include <malloc.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include <psp2/kernel/sysmem.h>
 #include <psp2/io/stat.h>
@@ -27,6 +29,88 @@ void load_shader(GLuint shader, const char * string, size_t length);
 static volatile int pointer_visible;
 static volatile int pointer_screen_x = 480;
 static volatile int pointer_screen_y = 272;
+
+#define BG2V_GL_COMPRESSED_RGB8_ETC2 0x9274
+#define BG2V_GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2 0x9276
+
+/*
+ * vitaGL already links detex's ETC2 block decoder for ETC2/EAC textures, but
+ * its public compressed-texture switch does not accept the RGB or one-bit
+ * alpha ETC2 enums used by BG2's area pages. Reuse the linked decoder here so
+ * the port stays reproducible without carrying a modified vitaGL submodule.
+ */
+extern bool detexDecompressBlockETC2(
+    const uint8_t *bitstream, uint32_t mode_mask,
+    uint32_t flags, uint8_t *pixels);
+extern bool detexDecompressBlockETC2_PUNCHTHROUGH(
+    const uint8_t *bitstream, uint32_t mode_mask,
+    uint32_t flags, uint8_t *pixels);
+
+#define BG2V_DETEX_MODE_MASK_ALL 0xFFFFFFFFu
+
+static unsigned int compressed_texture_count;
+
+static GLuint bg2v_bound_texture_2d(void) {
+    GLint texture = 0;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &texture);
+    return texture > 0 ? (GLuint)texture : 0;
+}
+
+static void *bg2v_decode_etc2(
+    GLenum internal_format, GLsizei width, GLsizei height,
+    GLsizei image_size, const GLvoid *data) {
+    if (data == NULL || width <= 0 || height <= 0) {
+        return NULL;
+    }
+
+    unsigned int blocks_x = ((unsigned int)width + 3) / 4;
+    unsigned int blocks_y = ((unsigned int)height + 3) / 4;
+    size_t expected_size = (size_t)blocks_x * blocks_y * 8;
+    size_t output_size = (size_t)width * height * 4;
+    if (image_size < 0 || (size_t)image_size < expected_size ||
+        output_size > UINT32_MAX) {
+        return NULL;
+    }
+
+    uint32_t *output = (uint32_t *)vglMalloc((uint32_t)output_size);
+    if (output == NULL) {
+        return NULL;
+    }
+
+    const uint8_t *source = (const uint8_t *)data;
+    bool (*decode_block)(const uint8_t *, uint32_t, uint32_t, uint8_t *) =
+        internal_format ==
+                BG2V_GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2
+            ? detexDecompressBlockETC2_PUNCHTHROUGH
+            : detexDecompressBlockETC2;
+
+    for (unsigned int block_y = 0; block_y < blocks_y; ++block_y) {
+        for (unsigned int block_x = 0; block_x < blocks_x; ++block_x) {
+            uint32_t block[16] = {0};
+            bool decoded = decode_block(
+                source, BG2V_DETEX_MODE_MASK_ALL, 0,
+                (uint8_t *)block);
+            source += 8;
+            if (!decoded) {
+                for (int i = 0; i < 16; ++i) {
+                    block[i] = 0xFFFF00FFu;
+                }
+            }
+
+            for (unsigned int y = 0; y < 4; ++y) {
+                unsigned int destination_y = block_y * 4 + y;
+                if (destination_y >= (unsigned int)height) break;
+                for (unsigned int x = 0; x < 4; ++x) {
+                    unsigned int destination_x = block_x * 4 + x;
+                    if (destination_x >= (unsigned int)width) break;
+                    output[(size_t)destination_y * width + destination_x] =
+                        block[y * 4 + x];
+                }
+            }
+        }
+    }
+    return output;
+}
 
 void gl_pointer_set(float x, float y, GLboolean visible) {
     pointer_screen_x = (int)x;
@@ -100,14 +184,27 @@ void gl_preload() {
 }
 
 void gl_init() {
+    static GLboolean initialized;
+    if (initialized) {
+        return;
+    }
+
     /*
      * BG2 renders at the Vita's native resolution and performs full-screen
      * texture uploads for movies. 4x MSAA multiplies that bandwidth without
      * helping the pre-rendered video, so keep the default framebuffer
      * single-sampled.
      */
-    vglInitExtended(
+    GLboolean fallback = vglInitExtended(
         0, 960, 544, 6 * 1024 * 1024, SCE_GXM_MULTISAMPLE_NONE);
+    initialized = GL_TRUE;
+
+    bg2v_log_printf(
+        "[BG2V][VGL] initialized%s; pool free=%u KiB total=%u KiB; "
+        "in-place texture updates enabled\n",
+        fallback ? " with resolution fallback" : "",
+        (unsigned int)(vglMemFree(VGL_MEM_ALL) / 1024),
+        (unsigned int)(vglMemTotal(VGL_MEM_ALL) / 1024));
 }
 
 void gl_swap() {
@@ -117,6 +214,55 @@ void gl_swap() {
      * path.
      */
     vglSwapBuffers(GL_TRUE);
+}
+
+void glCompressedTexImage2D_soloader(
+    GLenum target, GLint level, GLenum internal_format,
+    GLsizei width, GLsizei height, GLint border,
+    GLsizei image_size, const GLvoid *data) {
+    GLuint texture =
+        target == GL_TEXTURE_2D ? bg2v_bound_texture_2d() : 0;
+
+    size_t free_before = vglMemFree(VGL_MEM_ALL);
+    void *decoded = NULL;
+    if (internal_format == BG2V_GL_COMPRESSED_RGB8_ETC2 ||
+        internal_format ==
+            BG2V_GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2) {
+        decoded = bg2v_decode_etc2(
+            internal_format, width, height, image_size, data);
+    }
+
+    if (decoded != NULL) {
+        glTexImage2D(target, level, GL_RGBA, width, height, border,
+                     GL_RGBA, GL_UNSIGNED_BYTE, decoded);
+        vglFree(decoded);
+    } else {
+        glCompressedTexImage2D(
+            target, level, internal_format, width, height, border,
+            image_size, data);
+    }
+    size_t free_after = vglMemFree(VGL_MEM_ALL);
+
+    ++compressed_texture_count;
+    if (compressed_texture_count <= 96 ||
+        internal_format == BG2V_GL_COMPRESSED_RGB8_ETC2 ||
+        internal_format ==
+            BG2V_GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2) {
+        const unsigned char *bytes = (const unsigned char *)data;
+        bg2v_log_printf(
+            "[BG2V][CTEX] image #%u id=%u level=%d %dx%d "
+            "internal=0x%x bytes=%d data=%s prefix=%02x%02x%02x%02x "
+            "path=%s pool %u -> %u KiB\n",
+            compressed_texture_count, texture, level, width, height,
+            internal_format, image_size, data != NULL ? "yes" : "no",
+            data != NULL && image_size > 0 ? bytes[0] : 0,
+            data != NULL && image_size > 1 ? bytes[1] : 0,
+            data != NULL && image_size > 2 ? bytes[2] : 0,
+            data != NULL && image_size > 3 ? bytes[3] : 0,
+            decoded != NULL ? "ETC2-RGBA" : "vitaGL",
+            (unsigned int)(free_before / 1024),
+            (unsigned int)(free_after / 1024));
+    }
 }
 
 /*
@@ -150,6 +296,21 @@ EGLBoolean eglSwapBuffers_soloader(EGLDisplay display, EGLSurface surface) {
             "(%u.%u fps)\n",
             swap_count, (unsigned long long)elapsed_ms,
             fps_x10 / 10, fps_x10 % 10);
+        bg2v_log_printf(
+            "[BG2V][VGL] swap #%u: pool free=%u KiB / %u KiB\n",
+            swap_count,
+            (unsigned int)(vglMemFree(VGL_MEM_ALL) / 1024),
+            (unsigned int)(vglMemTotal(VGL_MEM_ALL) / 1024));
+        if ((swap_count % 600) == 0) {
+            struct mallinfo heap = mallinfo();
+            bg2v_log_printf(
+                "[BG2V][MEM] swap #%u: CPU heap arena=%u KiB "
+                "used=%u KiB free=%u KiB\n",
+                swap_count,
+                (unsigned int)(heap.arena / 1024),
+                (unsigned int)(heap.uordblks / 1024),
+                (unsigned int)(heap.fordblks / 1024));
+        }
         timing_window_start_ms = now_ms;
     }
 

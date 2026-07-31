@@ -771,7 +771,7 @@ so_default_dynlib default_dynlib[] = {
         { "glColorMask", (uintptr_t)&glColorMask },
         { "glColorPointer", (uintptr_t)&glColorPointer },
         { "glCompileShader", (uintptr_t)&glCompileShader_soloader },
-        { "glCompressedTexImage2D", (uintptr_t)&glCompressedTexImage2D },
+        { "glCompressedTexImage2D", (uintptr_t)&glCompressedTexImage2D_soloader },
         { "glCompressedTexSubImage2D", (uintptr_t)&ret0 },
         { "glCopyTexImage2D", (uintptr_t)&glCopyTexImage2D },
         { "glCopyTexSubImage2D", (uintptr_t)&glCopyTexSubImage2D },
@@ -1161,7 +1161,7 @@ so_default_dynlib default_dynlib[] = {
         { "getpid", (uintptr_t)&getpid },
         { "sbrk", (uintptr_t)&sbrk },
         { "syscall", (uintptr_t)&syscall },
-        { "sysconf", (uintptr_t)&ret0 },
+        { "sysconf", (uintptr_t)&sysconf_soloader },
         { "system", (uintptr_t)&system },
         { "waitpid", (uintptr_t)&ret0 },
 

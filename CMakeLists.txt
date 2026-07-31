@@ -73,10 +73,10 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   #add_definitions(-DDEBUG_PIPEFD=1)
   #add_definitions(-DDEBUG_CALLBACKS=1)
   # Space-separated flags passed to vitaGL
-  set(VITAGL_MAKE_FLAGS "SOFTFP_ABI=1 NO_SPLASHSCREEN=1 NO_DEBUG=1")
+  set(VITAGL_MAKE_FLAGS "SOFTFP_ABI=1 NO_SPLASHSCREEN=1 NO_DEBUG=1 TEXTURES_SPEEDHACK=1")
 else()
   # Space-separated flags passed to vitaGL
-  set(VITAGL_MAKE_FLAGS "SOFTFP_ABI=1 NO_SPLASHSCREEN=1 NO_DEBUG=1")
+  set(VITAGL_MAKE_FLAGS "SOFTFP_ABI=1 NO_SPLASHSCREEN=1 NO_DEBUG=1 TEXTURES_SPEEDHACK=1")
 endif()
 
 # makes sincos, sincosf, etc. visible

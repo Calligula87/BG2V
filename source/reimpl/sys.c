@@ -160,3 +160,76 @@ int setenv_soloader(const char * name, const char * value, int overwrite) {
 int getpagesize(void) {
     return PAGE_SIZE;
 }
+
+/*
+ * Android/Bionic uses its own numeric _SC_* namespace. Passing these values
+ * to newlib's sysconf() is therefore not portable. BG2's bundled SDL queries
+ * the online CPU count and page size; returning zero made the engine report
+ * no worker CPUs and could leave Infinity Engine tile jobs unprocessed.
+ *
+ * Values below match Bionic's sys/sysconf.h from the Android generation used
+ * by this ARMv7 build.
+ */
+#define BIONIC_SC_CLK_TCK                    0x0006
+#define BIONIC_SC_OPEN_MAX                   0x000b
+#define BIONIC_SC_STREAM_MAX                 0x001b
+#define BIONIC_SC_PAGESIZE                   0x0027
+#define BIONIC_SC_PAGE_SIZE                  0x0028
+#define BIONIC_SC_THREAD_KEYS_MAX            0x004b
+#define BIONIC_SC_THREAD_STACK_MIN           0x004c
+#define BIONIC_SC_THREAD_THREADS_MAX         0x004d
+#define BIONIC_SC_NPROCESSORS_CONF           0x0060
+#define BIONIC_SC_NPROCESSORS_ONLN           0x0061
+#define BIONIC_SC_PHYS_PAGES                 0x0062
+#define BIONIC_SC_AVPHYS_PAGES               0x0063
+
+long sysconf_soloader(int name) {
+    long value;
+    switch (name) {
+        case BIONIC_SC_CLK_TCK:
+            value = 100;
+            break;
+        case BIONIC_SC_OPEN_MAX:
+            value = 1024;
+            break;
+        case BIONIC_SC_STREAM_MAX:
+            value = 16;
+            break;
+        case BIONIC_SC_PAGESIZE:
+        case BIONIC_SC_PAGE_SIZE:
+            value = PAGE_SIZE;
+            break;
+        case BIONIC_SC_THREAD_KEYS_MAX:
+            value = 128;
+            break;
+        case BIONIC_SC_THREAD_STACK_MIN:
+            value = 16 * 1024;
+            break;
+        case BIONIC_SC_THREAD_THREADS_MAX:
+            value = 256;
+            break;
+        case BIONIC_SC_NPROCESSORS_CONF:
+        case BIONIC_SC_NPROCESSORS_ONLN:
+            value = 4;
+            break;
+        case BIONIC_SC_PHYS_PAGES:
+            value = (512 * 1024 * 1024) / PAGE_SIZE;
+            break;
+        case BIONIC_SC_AVPHYS_PAGES:
+            value = (128 * 1024 * 1024) / PAGE_SIZE;
+            break;
+        default:
+            errno = EINVAL;
+            value = -1;
+            break;
+    }
+
+    static unsigned int query_count;
+    ++query_count;
+    if (query_count <= 32 || value < 0) {
+        bg2v_log_printf(
+            "[BG2V][SYSCONF] query #%u name=0x%x -> %ld\n",
+            query_count, name, value);
+    }
+    return value;
+}

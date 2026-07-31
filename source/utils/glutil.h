@@ -42,6 +42,11 @@ void glCompileShader_soloader(GLuint shader);
 void glShaderSource_soloader(GLuint shader, GLsizei count,
                              const GLchar **string, const GLint *_length);
 
+void glCompressedTexImage2D_soloader(
+    GLenum target, GLint level, GLenum internal_format,
+    GLsizei width, GLsizei height, GLint border,
+    GLsizei image_size, const GLvoid *data);
+
 #ifdef __cplusplus
 };
 #endif
