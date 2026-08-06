@@ -44,4 +44,21 @@ The completed first device milestone was intentionally small:
 4. initialize vitaGL;
 5. display an explicit success message instead of entering an unfinished loop.
 
-See [`docs/BUILDING.md`](docs/BUILDING.md) for setup and build instructions.
+See [`docs/INSTALL.md`](docs/INSTALL.md) for the end-user installation guide.
+See [`docs/BUILDING.md`](docs/BUILDING.md) for development setup and build
+instructions.
+
+## Installing the Vita build
+
+The downloadable VPK contains the Vita wrapper, not the Baldur's Gate game
+data. Users must supply their own legally obtained Android APK. The APK can be
+prepared automatically on a Windows PC:
+
+```powershell
+python tools/prepare_vita_data.py "BG2.apk" ".\bg2v-data"
+```
+
+Copy the contents of `bg2v-data` to `ux0:data/bg2v/` with VitaShell's FTP
+server, then install `BG2v0_beta.vpk`. The data folder must contain the ARMv7
+library and both matching OBB files. Do not upload APK/OBB data to GitHub or
+include it in a release VPK.
