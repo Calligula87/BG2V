@@ -37,9 +37,9 @@ cmake -S "$NATIVE_SOURCE" -B "$NATIVE_BUILD" \
     -DCMAKE_BUILD_TYPE=Debug
 cmake --build "$NATIVE_BUILD" --parallel "${BG2V_BUILD_JOBS:-4}"
 
-cp "$NATIVE_BUILD/BG2VBETA.vpk" "$OUTPUT_DIR/BG2VBETA-debug.vpk"
+cp "$NATIVE_BUILD/BG2v0_beta.vpk" "$OUTPUT_DIR/BG2v0_beta.vpk"
 cp "$NATIVE_BUILD/eboot.bin" "$OUTPUT_DIR/eboot-debug.bin"
 cp "$NATIVE_BUILD/bg2v" "$OUTPUT_DIR/bg2v-debug.elf"
-sha256sum "$OUTPUT_DIR/BG2VBETA-debug.vpk" \
+sha256sum "$OUTPUT_DIR/BG2v0_beta.vpk" \
     "$OUTPUT_DIR/eboot-debug.bin" \
     "$OUTPUT_DIR/bg2v-debug.elf"

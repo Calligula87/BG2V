@@ -41,7 +41,7 @@ overwrite another VitaSDK. The build script refuses to use a hard-float
 compiler. Debug is intentional for the first run because unresolved imports and
 JNI lookups must appear in the log. The script stages the build on WSL's native
 filesystem because Vita's VPK tool cannot handle spaces in Windows paths. It
-copies the results back to `artifacts/BG2VBETA-debug.vpk` and
+copies the results back to `artifacts/BG2v0_beta.vpk` and
 `artifacts/eboot-debug.bin`; this directory is intentionally ignored by Git.
 
 On Linux, either use the same scripts or set `VITASDK` to an existing soft-float

@@ -13,7 +13,7 @@ include("${VITASDK}/share/vita.cmake" REQUIRED)
 # Vita application configuration
 set(VITA_APP_NAME "BG2VBETA")
 set(VITA_TITLEID "BG2V00001")
-set(VITA_VPKNAME "BG2VBETA")
+set(VITA_VPKNAME "BG2v0_beta")
 set(VITA_VERSION "01.01")
 set(VITA_MKSFOEX_FLAGS "-d ATTRIBUTE2=12")
 
