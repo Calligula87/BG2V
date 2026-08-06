@@ -46,6 +46,8 @@ typedef void (*bg2_sdl_native_surface_fn)(
 typedef void (*bg2_sdl_native_mouse_fn)(
     JNIEnv *env, jclass activity_class, jint button, jint action,
     jfloat x, jfloat y);
+typedef void (*bg2_sdl_native_pan_fn)(
+    JNIEnv *env, jclass activity_class, jfloat delta_x, jfloat delta_y);
 typedef void (*bg2_sdl_native_commit_text_fn)(
     JNIEnv *env, jobject input_connection, jstring text, jint new_cursor);
 typedef int (*bg2_sdl_send_keyboard_text_fn)(const char *text);
@@ -68,12 +70,23 @@ static bg2_sdl_native_touch_fn SDLActivity_onNativeTouch;
 static bg2_sdl_native_resize_fn SDLActivity_onNativeResize;
 static bg2_sdl_native_surface_fn SDLActivity_onNativeSurfaceChanged;
 static bg2_sdl_native_mouse_fn SDLActivity_onNativeMouse;
+static bg2_sdl_native_pan_fn SDLActivity_onNativePan;
 static bg2_sdl_native_commit_text_fn SDLInputConnection_nativeCommitText;
 static bg2_sdl_send_keyboard_text_fn SDL_SendKeyboardText_internal;
 static bg2_sdl_send_editing_text_fn SDL_SendEditingText_internal;
 static bg2_sdl_start_text_input_fn SDL_StartTextInput;
 static float pointer_x = 480.0f;
 static float pointer_y = 272.0f;
+static unsigned int pointer_button_state;
+static int pointer_drag_active;
+static int native_touch_moved;
+static int native_touch_active_id = -1;
+static float native_touch_down_x;
+static float native_touch_down_y;
+static float native_touch_last_x;
+static float native_touch_last_y;
+
+#define BG2V_TOUCH_SLOP_PIXELS 8.0f
 
 #define BG2V_NAME_FIELD_X 480.0f
 #define BG2V_NAME_FIELD_Y 215.0f
@@ -81,6 +94,7 @@ static float pointer_y = 272.0f;
 extern int bg2v_take_text_input_request(void);
 extern void bg2v_finish_text_input(void);
 extern void bg2v_queue_chargen_name(const char *name);
+extern volatile int bg2v_selection_enabled;
 
 static void bg2v_refocus_text_field(void) {
     /*
@@ -140,6 +154,8 @@ static void require_sdl_input_bridges(void) {
             "Java_org_libsdl_app_SDLActivity_onNativeSurfaceChanged");
     SDLActivity_onNativeMouse = (bg2_sdl_native_mouse_fn)so_symbol(
         &so_mod, "Java_org_libsdl_app_SDLActivity_onNativeMouse");
+    SDLActivity_onNativePan = (bg2_sdl_native_pan_fn)so_symbol(
+        &so_mod, "Java_org_libsdl_app_SDLActivity_onNativePan");
     SDLInputConnection_nativeCommitText =
         (bg2_sdl_native_commit_text_fn)so_symbol(
             &so_mod,
@@ -164,6 +180,7 @@ static void require_sdl_input_bridges(void) {
     if (!SDLActivity_onNativeKeyDown || !SDLActivity_onNativeKeyUp ||
         !SDLActivity_onNativeTouch || !SDLActivity_onNativeResize ||
         !SDLActivity_onNativeSurfaceChanged || !SDLActivity_onNativeMouse ||
+        !SDLActivity_onNativePan ||
         !SDLInputConnection_nativeCommitText ||
         !SDL_SendKeyboardText_internal || !SDL_SendEditingText_internal ||
         !SDL_StartTextInput) {
@@ -367,21 +384,85 @@ void controls_handler_key(int32_t keycode, ControlsAction action) {
 void controls_handler_touch(int32_t id, float x, float y, ControlsAction action) {
     /*
      * Preserve the most recent touch location as well as analog-pointer
-     * location. The IME refocus sequence needs the exact box the user tapped.
+     * location. The IME refocus sequence needs the exact box the user tapped,
+     * and keeping the software pointer visible makes touch and stick input
+     * share one predictable cursor position.
      */
     pointer_x = x;
     pointer_y = y;
-    gl_pointer_set(pointer_x, pointer_y, GL_FALSE);
+    gl_pointer_set(pointer_x, pointer_y, GL_TRUE);
     jint android_action;
     switch (action) {
     case CONTROLS_ACTION_DOWN:
         android_action = 0; /* MotionEvent.ACTION_DOWN */
+        native_touch_moved = 0;
+        native_touch_active_id = id;
+        native_touch_down_x = x;
+        native_touch_down_y = y;
+        native_touch_last_x = x;
+        native_touch_last_y = y;
+        bg2v_log_printf(
+            "[BG2V][TOUCH] down id=%d at %.0f,%.0f\n", id, x, y);
         break;
     case CONTROLS_ACTION_UP:
         android_action = 1; /* MotionEvent.ACTION_UP */
+        bg2v_log_printf(
+            "[BG2V][TOUCH] up id=%d at %.0f,%.0f moved=%d\n",
+            id, x, y, native_touch_moved);
+        if (native_touch_active_id == id) {
+            native_touch_active_id = -1;
+        }
         break;
     default:
         android_action = 2; /* MotionEvent.ACTION_MOVE */
+        if (native_touch_active_id == id) {
+            float delta_x;
+            float delta_y;
+
+            if (!native_touch_moved) {
+                /*
+                 * Android's GestureDetector suppresses sub-touch-slop motion.
+                 * Preserve the DOWN position until the gesture crosses that
+                 * threshold so a slow drag does not begin as a series of
+                 * one-pixel selection boxes.
+                 */
+                delta_x = x - native_touch_down_x;
+                delta_y = y - native_touch_down_y;
+                if ((delta_x * delta_x) + (delta_y * delta_y) <
+                    BG2V_TOUCH_SLOP_PIXELS * BG2V_TOUCH_SLOP_PIXELS) {
+                    break;
+                }
+            } else {
+                if (bg2v_selection_enabled) {
+                    /*
+                     * BG2's mobile selection handler adds the pan delta to
+                     * SDL's mouse position. Vita raw-touch events do not move
+                     * that internal mouse position, so use displacement from
+                     * DOWN to provide the absolute rectangle extent.
+                     */
+                    delta_x = x - native_touch_down_x;
+                    delta_y = y - native_touch_down_y;
+                } else {
+                    delta_x = x - native_touch_last_x;
+                    delta_y = y - native_touch_last_y;
+                }
+            }
+
+            if (delta_x != 0.0f || delta_y != 0.0f) {
+                native_touch_last_x = x;
+                native_touch_last_y = y;
+                SDLActivity_onNativePan(
+                    &jni, (jclass)0x42424242, delta_x, delta_y);
+                if (!native_touch_moved) {
+                    native_touch_moved = 1;
+                    bg2v_log_printf(
+                        "[BG2V][TOUCH] native pan id=%d delta=%.1f,%.1f "
+                        "at %.0f,%.0f selection=%d\n",
+                        id, delta_x, delta_y, x, y,
+                        bg2v_selection_enabled);
+                }
+            }
+        }
         break;
     }
 
@@ -404,18 +485,59 @@ void controls_handler_analog(ControlsStickId which, float x, float y, ControlsAc
     if (pointer_y > 543.0f) pointer_y = 543.0f;
     gl_pointer_set(pointer_x, pointer_y, GL_TRUE);
 
-    /* MotionEvent.ACTION_HOVER_MOVE */
+    /*
+     * A held Android mouse button must accompany ACTION_MOVE for Beamdog's
+     * SDL fork to retain drag state. HOVER_MOVE is reserved for movement with
+     * no buttons down. This is what lets BG2 draw its party-selection box
+     * while Cross is held and the left stick moves.
+     */
+    jint motion_action =
+        pointer_button_state != 0 ? 2 : 7; /* ACTION_MOVE / HOVER_MOVE */
+    if (pointer_button_state != 0 && !pointer_drag_active) {
+        pointer_drag_active = 1;
+        bg2v_log_printf(
+            "[BG2V][INPUT] pointer drag begin buttons=0x%x at %.0f,%.0f\n",
+            pointer_button_state, pointer_x, pointer_y);
+    }
     SDLActivity_onNativeMouse(
-        &jni, (jclass)0x42424242, 0, 7, pointer_x, pointer_y);
+        &jni, (jclass)0x42424242, (jint)pointer_button_state,
+        motion_action, pointer_x, pointer_y);
 }
 
 void controls_handler_pointer_button(int32_t button, ControlsAction action) {
     jint android_action =
         action == CONTROLS_ACTION_DOWN ? 0 : 1; /* ACTION_DOWN / ACTION_UP */
+
+    if (action == CONTROLS_ACTION_DOWN) {
+        pointer_button_state |= (unsigned int)button;
+        pointer_drag_active = 0;
+    }
+
+    /* Position the Android mouse before changing the requested button. */
     SDLActivity_onNativeMouse(
-        &jni, (jclass)0x42424242, 0, 7, pointer_x, pointer_y);
+        &jni, (jclass)0x42424242, 0,
+        7, pointer_x, pointer_y);
+
+    /*
+     * onNativeMouse's first integer is the button which changed, not the
+     * post-event button-state mask.  In particular ACTION_UP must still carry
+     * button 1; clearing the mask first sent a bogus "button 0 released" and
+     * left Beamdog's selection gesture unfinished.
+     */
     SDLActivity_onNativeMouse(
-        &jni, (jclass)0x42424242, button, android_action,
+        &jni, (jclass)0x42424242, (jint)button,
+        android_action,
         pointer_x, pointer_y);
+
+    if (action == CONTROLS_ACTION_UP) {
+        pointer_button_state &= ~(unsigned int)button;
+    }
+
+    if (action == CONTROLS_ACTION_UP && pointer_drag_active) {
+        bg2v_log_printf(
+            "[BG2V][INPUT] pointer drag end at %.0f,%.0f\n",
+            pointer_x, pointer_y);
+        pointer_drag_active = 0;
+    }
 }
 #endif

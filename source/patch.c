@@ -73,6 +73,8 @@ static so_hook lua_loadbuffer_hook;
 static so_hook lua_loadfile_hook;
 static so_hook lua_throw_hook;
 static so_hook sdl_poll_event_hook;
+static so_hook game_area_set_selection_hook;
+volatile int bg2v_selection_enabled;
 static lua_tolstring_fn engine_lua_tolstring;
 static lua_gettop_fn engine_lua_gettop;
 static lua_settop_fn engine_lua_settop;
@@ -163,6 +165,29 @@ static void install_sdl_input_diagnostics(void) {
 	sdl_poll_event_hook =
 		hook_addr(poll_event, (uintptr_t)&hooked_sdl_poll_event);
 }
+
+static void hooked_game_area_set_selection(void *area, int enabled) {
+	bg2v_selection_enabled = enabled != 0;
+	bg2v_log_printf(
+		"[BG2V][SELECT] native SetSelectionEnabled(%d) area=%p\n",
+		enabled, area);
+	(void)SO_CONTINUE(
+		int, game_area_set_selection_hook, area, enabled);
+}
+
+static void install_selection_diagnostics(void) {
+	uintptr_t set_selection = so_symbol(
+		&so_mod, "_ZN9CGameArea19SetSelectionEnabledEi");
+	if (set_selection == 0) {
+		fatal_error("BG2V could not install native selection diagnostics.");
+	}
+	game_area_set_selection_hook = hook_addr(
+		set_selection, (uintptr_t)&hooked_game_area_set_selection);
+	bg2v_log_printf(
+		"[BG2V][SELECT] native diagnostic installed at 0x%08x\n",
+		(unsigned int)set_selection);
+}
+
 
 /*
  * The Android Java bootstrap normally creates this table before
@@ -396,6 +421,7 @@ void so_patch(void) {
 	kuser_patch();
 	install_lua_diagnostics();
 	install_sdl_input_diagnostics();
+	install_selection_diagnostics();
 	// Sample hook with symbol name
 	// hook_addr((uintptr_t)so_symbol(&so_mod, "_ZN6glitch2os7Printer5printEPKcz"), (uintptr_t)&hookedFunction);
 	// Or with offset
