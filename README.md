@@ -50,15 +50,7 @@ instructions.
 
 ## Installing the Vita build
 
-The downloadable VPK contains the Vita wrapper, not the Baldur's Gate game
-data. Users must supply their own legally obtained Android APK. The APK can be
-prepared automatically on a Windows PC:
-
-```powershell
-python tools/prepare_vita_data.py "BG2.apk" ".\bg2v-data"
-```
-
-Copy the contents of `bg2v-data` to `ux0:data/bg2v/` with VitaShell's FTP
-server, then install `BG2v0_beta.vpk`. The data folder must contain the ARMv7
-library and both matching OBB files. Do not upload APK/OBB data to GitHub or
-include it in a release VPK.
+The VPK contains the Vita wrapper, not the game data. Users supply their own
+Android APK, run the included preparation script, copy the generated folder to
+the Vita with VitaShell FTP, and then install the VPK. The complete numbered
+checklist is in [`docs/INSTALL.md`](docs/INSTALL.md).

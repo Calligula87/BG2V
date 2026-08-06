@@ -4,24 +4,45 @@ This guide prepares a legally obtained Baldur's Gate II: Enhanced Edition
 Android APK for the Vita wrapper. The game APK and its data are not included
 in the VPK or repository.
 
-## What you need
+## Follow these steps
 
-- A homebrew-capable Vita with VitaShell and `kubridge.skprx` installed.
-- `BG2v0_beta.vpk` from the project release.
-- Your own matching 32-bit Android APK (the ARMv7 build).
-- A Windows PC with Python 3 installed.
+### On the Windows PC
 
-## Prepare the data on Windows
+1. Install Python 3 if it is not already installed.
+2. Download the BG2V repository as a ZIP and extract it, or clone it with Git.
+3. Download `BG2v0_beta.vpk` from the project release page.
+4. Obtain your own legally purchased BG2 Enhanced Edition APK. Do not rename
+   or modify the APK.
+5. Open PowerShell in the extracted repository folder. For example:
 
-From a copy of the repository, run:
+   ```powershell
+   cd "C:\path\to\BG2V"
+   ```
 
-```powershell
-python tools/prepare_vita_data.py "C:\path\to\your\BG2.apk" ".\bg2v-data"
-```
+6. Run the preparation script, replacing the APK path with the real path:
 
-The script treats the APK as a ZIP archive and extracts the required native
-library and the embedded OBB expansion files. It also keeps a copy of the APK
-as `game.apk` because the compatibility layer exposes that path to the engine.
+   ```powershell
+   python tools\prepare_vita_data.py "C:\path\to\BG2.apk" ".\bg2v-data"
+   ```
+
+7. Wait for `Prepared Vita data in ...` to appear. The new `bg2v-data` folder
+   is the only folder that must be copied to the Vita.
+
+### On the Vita
+
+8. Open VitaShell and press **SELECT** to start its FTP server. Note the IP
+   address and port shown on the Vita.
+9. In an FTP program on the PC, connect to that address.
+10. Open `ux0:data/`. Create a folder named `bg2v` if it does not exist.
+11. Copy everything inside the PC's `bg2v-data` folder into `ux0:data/bg2v/`.
+12. Copy `BG2v0_beta.vpk` to any convenient Vita location, such as `ux0:data/`.
+13. In VitaShell, select the VPK and press **X** to install it.
+14. Return to the Vita home screen and launch **BG2VBETA**.
+
+The preparation script treats the APK as a ZIP archive and extracts the
+required native library and embedded OBB expansion files. It also keeps a copy
+of the APK as `game.apk` because the compatibility layer exposes that path to
+the engine.
 
 The output should contain:
 
@@ -33,14 +54,6 @@ bg2v-data\
 ├── patch.5826.com.beamdog.baldursgateIIenhancededition.obb
 └── assets\              (when the APK contains additional assets)
 ```
-
-## Copy data and install
-
-1. Start VitaShell and press **SELECT** to start its FTP server.
-2. Create `ux0:data/bg2v/` if it does not already exist.
-3. Copy the *contents* of `bg2v-data` into that directory.
-4. Copy `BG2v0_beta.vpk` to the Vita and install it with VitaShell.
-5. Launch **BG2VBETA**.
 
 The OBB filenames must remain unchanged and must match the APK version. Do not
 copy an ARM64 library; BG2V requires `lib/armeabi-v7a/libBaldursGate.so`.
