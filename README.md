@@ -1,7 +1,7 @@
-# BG2V
+# BG2VBETA
 
-Feasibility research and proof-of-concept work for running Baldur's Gate II:
-Enhanced Edition on PlayStation Vita.
+Beta port of Baldur's Gate II: Enhanced Edition for PlayStation Vita, built as
+a direct wrapper around the user's legally supplied Android ARMv7 game engine.
 
 The initial APK audit found a 32-bit ARMv7, soft-float native engine using SDL2,
 OpenGL ES 2, and OpenAL. This makes an Android-native-library wrapper technically

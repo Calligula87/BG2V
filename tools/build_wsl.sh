@@ -20,7 +20,8 @@ NATIVE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/bg2v-build.XXXXXX")"
 trap 'rm -rf "$NATIVE_ROOT"' EXIT
 NATIVE_SOURCE="$NATIVE_ROOT/source"
 NATIVE_BUILD="$NATIVE_ROOT/build"
-mkdir -p "$NATIVE_SOURCE" "$PROJECT_DIR/artifacts"
+OUTPUT_DIR="${BG2V_OUTPUT_DIR:-$PROJECT_DIR/artifacts}"
+mkdir -p "$NATIVE_SOURCE" "$OUTPUT_DIR"
 
 # vita-pack-vpk does not correctly quote Windows paths containing spaces.
 # Stage only the open-source project files on WSL's native filesystem.
@@ -36,9 +37,9 @@ cmake -S "$NATIVE_SOURCE" -B "$NATIVE_BUILD" \
     -DCMAKE_BUILD_TYPE=Debug
 cmake --build "$NATIVE_BUILD" --parallel "${BG2V_BUILD_JOBS:-4}"
 
-cp "$NATIVE_BUILD/BG2V.vpk" "$PROJECT_DIR/artifacts/BG2V-debug.vpk"
-cp "$NATIVE_BUILD/eboot.bin" "$PROJECT_DIR/artifacts/eboot-debug.bin"
-cp "$NATIVE_BUILD/bg2v" "$PROJECT_DIR/artifacts/bg2v-debug.elf"
-sha256sum "$PROJECT_DIR/artifacts/BG2V-debug.vpk" \
-    "$PROJECT_DIR/artifacts/eboot-debug.bin" \
-    "$PROJECT_DIR/artifacts/bg2v-debug.elf"
+cp "$NATIVE_BUILD/BG2VBETA.vpk" "$OUTPUT_DIR/BG2VBETA-debug.vpk"
+cp "$NATIVE_BUILD/eboot.bin" "$OUTPUT_DIR/eboot-debug.bin"
+cp "$NATIVE_BUILD/bg2v" "$OUTPUT_DIR/bg2v-debug.elf"
+sha256sum "$OUTPUT_DIR/BG2VBETA-debug.vpk" \
+    "$OUTPUT_DIR/eboot-debug.bin" \
+    "$OUTPUT_DIR/bg2v-debug.elf"
