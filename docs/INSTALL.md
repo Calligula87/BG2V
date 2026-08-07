@@ -56,9 +56,11 @@ files from different APK versions. The script specifically selects the
 32-bit Vita-compatible library at `lib/armeabi-v7a/libBaldursGate.so`; an
 ARM64 library is not compatible and should not be copied manually.
 
-## Optional movie optimization
+## Optional: smoother intro videos
 
-The game runs without movie overrides. To reduce startup-video stutter, use
-`tools/prepare_vita_movies.sh` with the patch OBB and copy the generated `.wbm`
-files to `ux0:data/bg2v/movies/`. These files remain user-supplied and are not
-redistributed by the project.
+You can skip this section. The game runs without any extra movie files.
+
+Advanced users can create Vita-optimized copies of the intro videos from their
+own patch OBB with `tools/prepare_vita_movies.sh`, then copy the generated files
+to `ux0:data/bg2v/movies/`. This only improves video smoothness; it is not part
+of the required installation.
