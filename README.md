@@ -18,7 +18,3 @@ Follow the numbered guide in [`docs/INSTALL.md`](docs/INSTALL.md).
 
 The game, APK, OBB files, and other copyrighted game data are not distributed
 by this project. Please use files from your own legitimate installation.
-
-## Development
-
-Development and build instructions are in [`docs/BUILDING.md`](docs/BUILDING.md).
