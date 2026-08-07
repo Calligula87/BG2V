@@ -9,11 +9,28 @@ Vita and by Android game version.
 
 ## Installation
 
-The VPK contains the Vita port, not the game itself. The Windows Setup package
-prepares your own Android APK by asking you to select it and then creates the
-folder that must be copied to the Vita. No command-line knowledge is required.
+You need `BG2v0_beta.vpk`, your own Baldur's Gate II Android APK, a Windows PC,
+and a homebrew-capable Vita with VitaShell.
 
-Follow the numbered guide in [`docs/INSTALL.md`](docs/INSTALL.md).
+1. Download and extract the **BG2V Windows Setup** package.
+2. Double-click **Prepare BG2V.bat**.
+3. Select your Baldur's Gate II APK when asked.
+4. Wait until the setup says **Success**. It will open a folder containing a
+   new folder named `bg2v`.
+5. Open VitaShell on the Vita and press **SELECT** to start its FTP server.
+6. Connect to the address displayed by VitaShell using an FTP program on the
+   PC.
+7. Copy the complete `bg2v` folder into `ux0:data/` on the Vita. The final path
+   must be `ux0:data/bg2v/`.
+8. Copy `BG2v0_beta.vpk` to the Vita and install it with VitaShell.
+9. Launch **BG2VBETA** from the Vita home screen.
+
+The Windows Setup uses tools already included with Windows. Python, WSL, and
+command-line knowledge are not required.
+
+Advanced users can still use `tools/prepare_vita_data.py` for manual APK data
+preparation and `tools/prepare_vita_movies.sh` to create optional smoother
+intro videos.
 
 ## Project policy
 
