@@ -1,9 +1,5 @@
 # BG2V installation
 
-This guide prepares a legally obtained Baldur's Gate II: Enhanced Edition
-Android APK for the Vita wrapper. The game APK and its data are not included
-in the VPK or repository.
-
 ## Follow these steps
 
 ### On the Windows PC
@@ -64,9 +60,3 @@ The game runs without movie overrides. To reduce startup-video stutter, use
 `tools/prepare_vita_movies.sh` with the patch OBB and copy the generated `.wbm`
 files to `ux0:data/bg2v/movies/`. These files remain user-supplied and are not
 redistributed by the project.
-
-## Troubleshooting
-
-If the game stops at startup, send `ux0:data/bg2v/bootstrap.log`. Confirm that
-the two OBB files are in `ux0:data/bg2v/` (not inside another nested folder),
-that the library is ARMv7, and that all files came from the same APK release.

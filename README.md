@@ -18,3 +18,10 @@ Follow the numbered guide in [`docs/INSTALL.md`](docs/INSTALL.md).
 
 The game, APK, OBB files, and other copyrighted game data are not distributed
 by this project. Please use files from your own legitimate installation.
+
+## Troubleshooting
+
+If you encounter a problem, please open an issue in this repository with a
+description of what happened and, when possible, the `ux0:data/bg2v/bootstrap.log`
+file. GitHub Issues will be available to everyone once the repository is made
+public.
