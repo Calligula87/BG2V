@@ -24,16 +24,30 @@
 7. Wait for `Prepared Vita data in ...` to appear. The new `bg2v-data` folder
    is the only folder that must be copied to the Vita.
 
+8. **Optional but recommended:** prepare smoother intro videos. Open a WSL or
+   Linux terminal in the repository (with `ffmpeg` and `unzip` installed) and
+   run:
+
+   ```sh
+   ./tools/prepare_vita_movies.sh \
+     ./bg2v-data/patch.5826.com.beamdog.baldursgateIIenhancededition.obb \
+     ./bg2v-data/movies
+   ```
+
+   If you do not use WSL/Linux, skip this step. The game still works; this
+   only improves video smoothness. The generated files are already placed in
+   `bg2v-data/movies/` for the next step.
+
 ### On the Vita
 
-8. Open VitaShell and press **SELECT** to start its FTP server. Note the IP
+9. Open VitaShell and press **SELECT** to start its FTP server. Note the IP
    address and port shown on the Vita.
-9. In an FTP program on the PC, connect to that address.
-10. Open `ux0:data/`. Create a folder named `bg2v` if it does not exist.
-11. Copy everything inside the PC's `bg2v-data` folder into `ux0:data/bg2v/`.
-12. Copy `BG2v0_beta.vpk` to any convenient Vita location, such as `ux0:data/`.
-13. In VitaShell, select the VPK and press **X** to install it.
-14. Return to the Vita home screen and launch **BG2VBETA**.
+10. In an FTP program on the PC, connect to that address.
+11. Open `ux0:data/`. Create a folder named `bg2v` if it does not exist.
+12. Copy everything inside the PC's `bg2v-data` folder into `ux0:data/bg2v/`.
+13. Copy `BG2v0_beta.vpk` to any convenient Vita location, such as `ux0:data/`.
+14. In VitaShell, select the VPK and press **X** to install it.
+15. Return to the Vita home screen and launch **BG2VBETA**.
 
 The preparation script treats the APK as a ZIP archive and extracts the
 required native library and embedded OBB expansion files. It also keeps a copy
@@ -55,12 +69,3 @@ The script obtains the library and OBB files from the APK for you. Do not mix
 files from different APK versions. The script specifically selects the
 32-bit Vita-compatible library at `lib/armeabi-v7a/libBaldursGate.so`; an
 ARM64 library is not compatible and should not be copied manually.
-
-## Optional: smoother intro videos
-
-You can skip this section. The game runs without any extra movie files.
-
-Advanced users can create Vita-optimized copies of the intro videos from their
-own patch OBB with `tools/prepare_vita_movies.sh`, then copy the generated files
-to `ux0:data/bg2v/movies/`. This only improves video smoothness; it is not part
-of the required installation.
