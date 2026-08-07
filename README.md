@@ -9,8 +9,9 @@ Vita and by Android game version.
 
 ## Installation
 
-The VPK contains the Vita port, not the game itself. You must provide your own
-legally obtained Android APK and prepare its data on a Windows PC.
+The VPK contains the Vita port, not the game itself. The Windows Setup package
+prepares your own Android APK by asking you to select it and then creates the
+folder that must be copied to the Vita. No command-line knowledge is required.
 
 Follow the numbered guide in [`docs/INSTALL.md`](docs/INSTALL.md).
 

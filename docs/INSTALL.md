@@ -1,71 +1,31 @@
 # BG2V installation
 
-## Follow these steps
+## Easy Windows setup
 
-### On the Windows PC
+You need `BG2v0_beta.vpk`, your own Baldur's Gate II Android APK, a Windows PC,
+and a Vita with VitaShell.
 
-1. Install Python 3 if it is not already installed.
-2. Download the BG2V repository as a ZIP and extract it, or clone it with Git.
-3. Download `BG2v0_beta.vpk` from the project release page.
-4. Obtain your own legally purchased BG2 Enhanced Edition APK. Do not rename
-   or modify the APK.
-5. Open PowerShell in the extracted repository folder. For example:
+1. Download and extract the BG2V Windows Setup package.
+2. Double-click **Prepare BG2V.bat**.
+3. Select your Baldur's Gate II APK when asked.
+4. Wait until the setup says **Success**. It will open a new folder containing
+   a folder named `bg2v`.
+5. Open VitaShell on the Vita and press **SELECT** to start FTP.
+6. Connect to the address shown by VitaShell using an FTP program on the PC.
+7. Copy the complete `bg2v` folder into `ux0:data/` on the Vita. The final path
+   must be `ux0:data/bg2v/`.
+8. Copy `BG2v0_beta.vpk` to the Vita and install it with VitaShell.
+9. Launch **BG2VBETA** from the Vita home screen.
 
-   ```powershell
-   cd "C:\path\to\BG2V"
-   ```
+The setup uses Windows' built-in tools. Python, WSL, and command-line knowledge
+are not required.
 
-6. Run the preparation script, replacing the APK path with the real path:
+## Advanced/manual setup
 
-   ```powershell
-   python tools\prepare_vita_data.py "C:\path\to\BG2.apk" ".\bg2v-data"
-   ```
+The original Python and WSL preparation tools remain available for advanced
+users and developers:
 
-7. Wait for `Prepared Vita data in ...` to appear. The new `bg2v-data` folder
-   is the only folder that must be copied to the Vita.
+- `tools/prepare_vita_data.py` extracts the required APK data.
+- `tools/prepare_vita_movies.sh` creates optional smoother intro videos.
 
-8. **Optional but recommended:** prepare smoother intro videos. Open a WSL or
-   Linux terminal in the repository (with `ffmpeg` and `unzip` installed) and
-   run:
-
-   ```sh
-   ./tools/prepare_vita_movies.sh \
-     ./bg2v-data/patch.5826.com.beamdog.baldursgateIIenhancededition.obb \
-     ./bg2v-data/movies
-   ```
-
-   If you do not use WSL/Linux, skip this step. The game still works; this
-   only improves video smoothness. The generated files are already placed in
-   `bg2v-data/movies/` for the next step.
-
-### On the Vita
-
-9. Open VitaShell and press **SELECT** to start its FTP server. Note the IP
-   address and port shown on the Vita.
-10. In an FTP program on the PC, connect to that address.
-11. Open `ux0:data/`. Create a folder named `bg2v` if it does not exist.
-12. Copy everything inside the PC's `bg2v-data` folder into `ux0:data/bg2v/`.
-13. Copy `BG2v0_beta.vpk` to any convenient Vita location, such as `ux0:data/`.
-14. In VitaShell, select the VPK and press **X** to install it.
-15. Return to the Vita home screen and launch **BG2VBETA**.
-
-The preparation script treats the APK as a ZIP archive and extracts the
-required native library and embedded OBB expansion files. It also keeps a copy
-of the APK as `game.apk` because the compatibility layer exposes that path to
-the engine.
-
-The output should contain:
-
-```text
-bg2v-data\
-├── game.apk
-├── libBaldursGate.so
-├── main.5826.com.beamdog.baldursgateIIenhancededition.obb
-├── patch.5826.com.beamdog.baldursgateIIenhancededition.obb
-└── assets\              (when the APK contains additional assets)
-```
-
-The script obtains the library and OBB files from the APK for you. Do not mix
-files from different APK versions. The script specifically selects the
-32-bit Vita-compatible library at `lib/armeabi-v7a/libBaldursGate.so`; an
-ARM64 library is not compatible and should not be copied manually.
+These tools are not required when using the Windows Setup package.
