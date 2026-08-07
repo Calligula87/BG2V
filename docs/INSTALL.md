@@ -51,8 +51,10 @@ bg2v-data\
 └── assets\              (when the APK contains additional assets)
 ```
 
-The OBB filenames must remain unchanged and must match the APK version. Do not
-copy an ARM64 library; BG2V requires `lib/armeabi-v7a/libBaldursGate.so`.
+The script obtains the library and OBB files from the APK for you. Do not mix
+files from different APK versions. The script specifically selects the
+32-bit Vita-compatible library at `lib/armeabi-v7a/libBaldursGate.so`; an
+ARM64 library is not compatible and should not be copied manually.
 
 ## Optional movie optimization
 
