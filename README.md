@@ -1,5 +1,9 @@
 # BG2VBETA
 
+<p align="center">
+  <img src="extras/livearea/icon0.png" alt="BG2V logo" width="180">
+</p>
+
 BG2VBETA is a community-made PlayStation Vita port of **Baldur's Gate II:
 Enhanced Edition**. It lets the game run on a homebrew-capable Vita with Vita
 controls, touchscreen support, and Vita-optimized startup videos.
@@ -20,6 +24,22 @@ Windows Setup package, and a homebrew-capable Vita with VitaShell.
 
 The Windows Setup uses tools already included with Windows. Python, WSL, and
 command-line knowledge are not required.
+
+## Controls
+
+<p align="center">
+  <img src="extras/loading/bg2v-loading.png" alt="BG2V controls" width="900">
+</p>
+
+- **D-pad:** Navigate
+- **Touchscreen:** Tap to select; drag to move or select an area
+- **Left stick:** Move the pointer
+- **X:** Select; hold to drag
+- **Circle / SELECT:** Back
+- **Triangle:** Cancel
+- **Square:** Secondary action
+- **L / R:** Change page
+- **START:** Confirm
 
 Advanced users can still use `tools/prepare_vita_data.py` for manual APK data
 preparation and `tools/prepare_vita_movies.sh` to create optional smoother
