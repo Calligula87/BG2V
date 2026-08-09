@@ -33,6 +33,7 @@ extern void controls_handler_key(int32_t keycode, ControlsAction action);
 extern void controls_handler_touch(int32_t id, float x, float y, ControlsAction action);
 extern void controls_handler_analog(ControlsStickId which, float x, float y, ControlsAction action);
 extern void controls_handler_pointer_button(int32_t button, ControlsAction action);
+extern void controls_handler_scroll(float y);
 
 enum {
     AKEYCODE_BACK = 4,

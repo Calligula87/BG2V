@@ -540,4 +540,18 @@ void controls_handler_pointer_button(int32_t button, ControlsAction action) {
         pointer_drag_active = 0;
     }
 }
+
+void controls_handler_scroll(float y) {
+    /*
+     * Android MotionEvent.ACTION_SCROLL is translated by BG2's SDL layer
+     * into an SDL mouse-wheel event. The game's touch-first menus ignore
+     * keyboard Page Up/Page Down, but consume this path for scrollable lists
+     * and text panels.
+     */
+    SDLActivity_onNativeMouse(
+        &jni, (jclass)0x42424242, 0,
+        8, /* MotionEvent.ACTION_SCROLL */
+        0.0f, y);
+    bg2v_log_printf("[BG2V][INPUT] scroll y=%.1f\n", y);
+}
 #endif

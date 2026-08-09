@@ -38,7 +38,7 @@ command-line knowledge are not required.
 - **Circle / SELECT:** Back
 - **Triangle:** Cancel
 - **Square:** Secondary action
-- **L / R:** Change page
+- **L / R:** Scroll up / down
 - **START:** Confirm
 
 Advanced users can still use `tools/prepare_vita_data.py` for manual APK data

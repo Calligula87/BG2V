@@ -112,8 +112,6 @@ static ButtonMapping mapping[] = {
         { SCE_CTRL_RIGHT,     AKEYCODE_DPAD_RIGHT },
         { SCE_CTRL_CIRCLE,    AKEYCODE_BACK },
         { SCE_CTRL_TRIANGLE,  AKEYCODE_ESCAPE },
-        { SCE_CTRL_L1,        AKEYCODE_PAGE_UP },
-        { SCE_CTRL_R1,        AKEYCODE_PAGE_DOWN },
         { SCE_CTRL_START,     AKEYCODE_ENTER },
         { SCE_CTRL_SELECT,    AKEYCODE_BACK },
 };
@@ -148,6 +146,12 @@ void poll_pad() {
         controls_handler_pointer_button(2, CONTROLS_ACTION_DOWN);
     if (released_buttons & SCE_CTRL_SQUARE)
         controls_handler_pointer_button(2, CONTROLS_ACTION_UP);
+
+    /* Scroll Android list and text panels with the shoulder buttons. */
+    if (pressed_buttons & SCE_CTRL_L1)
+        controls_handler_scroll(1.0f);
+    if (pressed_buttons & SCE_CTRL_R1)
+        controls_handler_scroll(-1.0f);
 
     for (int i = 0; i < sizeof(mapping) / sizeof(ButtonMapping); i++) {
         if (pressed_buttons & mapping[i].sce_button) {
