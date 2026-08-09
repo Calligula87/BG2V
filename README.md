@@ -41,5 +41,4 @@ by this project. Please use files from your own legitimate installation.
 
 If you encounter a problem, please open an issue in this repository with a
 description of what happened and, when possible, the `ux0:data/bg2v/bootstrap.log`
-file. GitHub Issues will be available to everyone once the repository is made
-public.
+file. 
