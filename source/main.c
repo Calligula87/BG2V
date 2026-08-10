@@ -432,6 +432,23 @@ void controls_handler_touch(int32_t id, float x, float y, ControlsAction action)
                     BG2V_TOUCH_SLOP_PIXELS * BG2V_TOUCH_SLOP_PIXELS) {
                     break;
                 }
+
+                if (!bg2v_selection_enabled) {
+                    /*
+                     * For ordinary map dragging, swallowing the first motion
+                     * frame after touch-slop avoids a noticeable "jump" where
+                     * the camera consumes the whole accumulated down-to-move
+                     * distance at once.
+                     */
+                    native_touch_moved = 1;
+                    native_touch_last_x = x;
+                    native_touch_last_y = y;
+                    bg2v_log_printf(
+                        "[BG2V][TOUCH] drag begin id=%d at %.0f,%.0f "
+                        "selection=0\n",
+                        id, x, y);
+                    break;
+                }
             } else {
                 if (bg2v_selection_enabled) {
                     /*
