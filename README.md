@@ -1,10 +1,10 @@
-# BG2VBETA
+# BG2V
 
 <p align="center">
   <img src="extras/livearea/icon0.png" alt="BG2V logo" width="180">
 </p>
 
-BG2VBETA is a community-made PlayStation Vita port of **Baldur's Gate II:
+BG2V is a community-made PlayStation Vita port of **Baldur's Gate II:
 Enhanced Edition**. It lets the game run on a homebrew-capable Vita with Vita
 controls, touchscreen support, and Vita-optimized startup videos.
 
