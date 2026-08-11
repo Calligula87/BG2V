@@ -1,4 +1,4 @@
-# Building BG2VBETA
+# Building BG2V
 
 BG2V is at the loader proof-of-concept stage. It does not run the game yet.
 The first VPK is designed to expose missing imports and prove that the Android

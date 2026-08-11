@@ -4,6 +4,9 @@
 #include "utils/logger.h"
 
 #include <psp2/kernel/threadmgr.h>
+#include <psp2/io/dirent.h>
+#include <psp2/io/fcntl.h>
+#include <psp2/io/stat.h>
 #include <string.h>
 
 #include <falso_jni/FalsoJNI.h>
@@ -90,6 +93,74 @@ static float native_touch_last_y;
 
 #define BG2V_NAME_FIELD_X 480.0f
 #define BG2V_NAME_FIELD_Y 215.0f
+
+#define BG2V_CONTROLS_MOVIE "app0:/bg2v-controls.wbm"
+#define BG2V_MOVIES_DIR DATA_PATH "movies"
+
+static int bg2v_copy_controls_movie(const char *destination) {
+    SceUID source = sceIoOpen(BG2V_CONTROLS_MOVIE, SCE_O_RDONLY, 0);
+    if (source < 0) {
+        return source;
+    }
+
+    SceUID target = sceIoOpen(
+        destination, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0666);
+    if (target < 0) {
+        sceIoClose(source);
+        return target;
+    }
+
+    char buffer[32 * 1024];
+    int result = 0;
+    for (;;) {
+        int bytes_read = sceIoRead(source, buffer, sizeof(buffer));
+        if (bytes_read < 0) {
+            result = bytes_read;
+            break;
+        }
+        if (bytes_read == 0) {
+            break;
+        }
+
+        int offset = 0;
+        while (offset < bytes_read) {
+            int bytes_written = sceIoWrite(
+                target, buffer + offset, bytes_read - offset);
+            if (bytes_written <= 0) {
+                result = bytes_written < 0 ? bytes_written : -1;
+                break;
+            }
+            offset += bytes_written;
+        }
+        if (result < 0) {
+            break;
+        }
+    }
+
+    sceIoClose(target);
+    sceIoClose(source);
+    if (result < 0) {
+        sceIoRemove(destination);
+    }
+    return result;
+}
+
+static void bg2v_install_controls_movies(void) {
+    static const char *const destinations[] = {
+        BG2V_MOVIES_DIR "/logo.wbm",
+        BG2V_MOVIES_DIR "/intro.wbm",
+        BG2V_MOVIES_DIR "/intro15f.wbm",
+    };
+
+    sceIoMkdir(BG2V_MOVIES_DIR, 0777);
+    for (unsigned int index = 0;
+         index < sizeof(destinations) / sizeof(destinations[0]); ++index) {
+        int result = bg2v_copy_controls_movie(destinations[index]);
+        bg2v_log_printf(
+            "[BG2V][MOVIES] controls screen -> %s: 0x%08x\n",
+            destinations[index], result);
+    }
+}
 
 extern int bg2v_take_text_input_request(void);
 extern void bg2v_finish_text_input(void);
@@ -218,6 +289,7 @@ static int bg2_sdl_thread(SceSize args, void *argp) {
 
 int main() {
     bg2v_log_reset();
+    bg2v_install_controls_movies();
     soloader_init_all();
 
     bg2_jni_on_load_fn JNI_OnLoad = require_jni_on_load();

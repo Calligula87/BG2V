@@ -18,6 +18,7 @@ $requiredEntries = @(
     "assets/$patchObb"
 )
 $startupMovies = @('logo.wbm', 'intro.wbm', 'intro15f.wbm')
+$controlsMovie = Join-Path $PSScriptRoot 'bg2v-controls.wbm'
 
 function Select-Bg2Apk {
     $dialog = New-Object System.Windows.Forms.OpenFileDialog
@@ -58,96 +59,17 @@ function Copy-ZipEntry {
     }
 }
 
-function Find-Ffmpeg {
-    $local = Join-Path $PSScriptRoot 'ffmpeg.exe'
-    if ([System.IO.File]::Exists($local)) {
-        return $local
-    }
-
-    $command = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
-    if ($command) {
-        return $command.Source
-    }
-
-    return $null
-}
-
 function Write-DefaultBaldurLua {
     param([string]$Destination)
 
     $content = @"
 SetPrivateProfileString('Program Options','Maximum Frame Rate','30')
-SetPrivateProfileString('MOVIES','LOGO','0')
-SetPrivateProfileString('MOVIES','INTRO','0')
-SetPrivateProfileString('MOVIES','INTRO15F','0')
+SetPrivateProfileString('MOVIES','LOGO','1')
+SetPrivateProfileString('MOVIES','INTRO','1')
+SetPrivateProfileString('MOVIES','INTRO15F','1')
 "@
 
     [System.IO.File]::WriteAllText($Destination, $content)
-}
-
-function Optimize-StartupMovies {
-    param(
-        [string]$PatchObbPath,
-        [string]$DestinationRoot,
-        [string]$FfmpegPath
-    )
-
-    $moviesDir = Join-Path $DestinationRoot 'movies'
-    [System.IO.Directory]::CreateDirectory($moviesDir) | Out-Null
-
-    $temporaryDir = Join-Path ([System.IO.Path]::GetTempPath()) `
-        ("bg2v-movies-" + [System.Guid]::NewGuid().ToString('N'))
-    [System.IO.Directory]::CreateDirectory($temporaryDir) | Out-Null
-
-    try {
-        $obbArchive = [System.IO.Compression.ZipFile]::OpenRead($PatchObbPath)
-        try {
-            foreach ($movie in $startupMovies) {
-                $entry = $obbArchive.GetEntry("movies/$movie")
-                if (-not $entry) {
-                    throw "Patch OBB is missing movies/$movie"
-                }
-
-                $sourceMovie = Join-Path $temporaryDir $movie
-                $outputMovie = Join-Path $moviesDir $movie
-                Copy-ZipEntry $entry $sourceMovie
-
-                $arguments = @(
-                    '-hide_banner',
-                    '-loglevel', 'warning',
-                    '-y',
-                    '-i', $sourceMovie,
-                    '-map', '0:v:0',
-                    '-map', '0:a?',
-                    '-vf', 'scale=640:360:flags=lanczos,fps=15',
-                    '-c:v', 'libvpx',
-                    '-b:v', '500k',
-                    '-crf', '20',
-                    '-deadline', 'good',
-                    '-cpu-used', '4',
-                    '-c:a', 'copy',
-                    $outputMovie
-                )
-
-                $process = Start-Process -FilePath $FfmpegPath `
-                    -ArgumentList $arguments `
-                    -NoNewWindow `
-                    -PassThru `
-                    -Wait
-                if ($process.ExitCode -ne 0) {
-                    throw "ffmpeg failed while converting $movie"
-                }
-            }
-        }
-        finally {
-            $obbArchive.Dispose()
-        }
-    }
-    finally {
-        if ([System.IO.Directory]::Exists($temporaryDir)) {
-            Remove-Item -LiteralPath $temporaryDir -Recurse -Force
-        }
-    }
 }
 
 try {
@@ -175,7 +97,9 @@ try {
 
     $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
     $vitaData = Join-Path $OutputRoot 'bg2v'
-    $ffmpegPath = Find-Ffmpeg
+    if (-not [System.IO.File]::Exists($controlsMovie)) {
+        throw 'Windows Setup is incomplete: bg2v-controls.wbm is missing.'
+    }
     [System.IO.Directory]::CreateDirectory($vitaData) | Out-Null
 
     Write-Host ''
@@ -242,18 +166,15 @@ try {
 
     [System.IO.File]::Copy($ApkPath, (Join-Path $vitaData 'game.apk'), $true)
 
-    $movieSummary = 'Startup videos will be skipped by default.'
-    if ($ffmpegPath) {
-        Write-Host '[extra] Optimizing startup movies for PS Vita...'
-        Optimize-StartupMovies `
-            -PatchObbPath (Join-Path $vitaData $patchObb) `
-            -DestinationRoot $vitaData `
-            -FfmpegPath $ffmpegPath
-        $movieSummary = 'Startup videos were optimized for PS Vita.'
-    } else {
-        Write-Host '[extra] ffmpeg not found; disabling startup videos to avoid stutter.'
-        Write-DefaultBaldurLua (Join-Path $vitaData 'Baldur.lua')
+    Write-Host '[extra] Installing the BG2V controls screen in place of startup videos...'
+    $moviesDir = Join-Path $vitaData 'movies'
+    [System.IO.Directory]::CreateDirectory($moviesDir) | Out-Null
+    foreach ($movie in $startupMovies) {
+        [System.IO.File]::Copy(
+            $controlsMovie, (Join-Path $moviesDir $movie), $true)
     }
+    Write-DefaultBaldurLua (Join-Path $vitaData 'Baldur.lua')
+    $movieSummary = 'Startup videos were replaced by the BG2V controls screen.'
 
     $instructions = @"
 BG2V data is ready.
@@ -262,7 +183,7 @@ BG2V data is ready.
 2. On the PC, connect to the FTP address displayed by VitaShell.
 3. Copy the folder named bg2v into ux0:data/ on the Vita.
 4. Install BG2v0_beta.vpk with VitaShell.
-5. Launch BG2VBETA from the Vita home screen.
+5. Launch BG2V from the Vita home screen.
 
 $movieSummary
 "@

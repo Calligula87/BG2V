@@ -11,7 +11,7 @@ project(bg2v C CXX)
 include("${VITASDK}/share/vita.cmake" REQUIRED)
 
 # Vita application configuration
-set(VITA_APP_NAME "BG2VBETA")
+set(VITA_APP_NAME "BG2V")
 set(VITA_TITLEID "BG2V00001")
 set(VITA_VPKNAME "BG2v0_beta")
 set(VITA_VERSION "01.01")
@@ -252,6 +252,7 @@ vita_create_vpk(${VITA_VPKNAME}.vpk ${VITA_TITLEID} eboot.bin
                 ${CMAKE_SOURCE_DIR}/extras/livearea/startup.png sce_sys/livearea/contents/startup.png
                 ${CMAKE_SOURCE_DIR}/extras/livearea/bg0.png sce_sys/livearea/contents/bg0.png
                 ${CMAKE_SOURCE_DIR}/extras/livearea/template.xml sce_sys/livearea/contents/template.xml
+                ${CMAKE_SOURCE_DIR}/extras/loading/bg2v-controls.wbm bg2v-controls.wbm
                 )
 
 add_custom_target(send
