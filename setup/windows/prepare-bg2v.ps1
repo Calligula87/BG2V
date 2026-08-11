@@ -17,8 +17,6 @@ $requiredEntries = @(
     "assets/$mainObb",
     "assets/$patchObb"
 )
-$startupMovies = @('logo.wbm', 'intro.wbm', 'intro15f.wbm')
-$controlsMovie = Join-Path $PSScriptRoot 'bg2v-controls.wbm'
 
 function Select-Bg2Apk {
     $dialog = New-Object System.Windows.Forms.OpenFileDialog
@@ -97,9 +95,6 @@ try {
 
     $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
     $vitaData = Join-Path $OutputRoot 'bg2v'
-    if (-not [System.IO.File]::Exists($controlsMovie)) {
-        throw 'Windows Setup is incomplete: bg2v-controls.wbm is missing.'
-    }
     [System.IO.Directory]::CreateDirectory($vitaData) | Out-Null
 
     Write-Host ''
@@ -166,15 +161,8 @@ try {
 
     [System.IO.File]::Copy($ApkPath, (Join-Path $vitaData 'game.apk'), $true)
 
-    Write-Host '[extra] Installing the BG2V controls screen in place of startup videos...'
-    $moviesDir = Join-Path $vitaData 'movies'
-    [System.IO.Directory]::CreateDirectory($moviesDir) | Out-Null
-    foreach ($movie in $startupMovies) {
-        [System.IO.File]::Copy(
-            $controlsMovie, (Join-Path $moviesDir $movie), $true)
-    }
     Write-DefaultBaldurLua (Join-Path $vitaData 'Baldur.lua')
-    $movieSummary = 'Startup videos were replaced by the BG2V controls screen.'
+    $movieSummary = 'The original game videos remain enabled.'
 
     $instructions = @"
 BG2V data is ready.
