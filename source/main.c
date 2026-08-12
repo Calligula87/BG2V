@@ -46,6 +46,8 @@ typedef void (*bg2_sdl_native_surface_fn)(
 typedef void (*bg2_sdl_native_mouse_fn)(
     JNIEnv *env, jclass activity_class, jint button, jint action,
     jfloat x, jfloat y);
+typedef void (*bg2_sdl_native_tap_fn)(
+    JNIEnv *env, jclass activity_class, jint x, jint y);
 typedef void (*bg2_sdl_native_pan_fn)(
     JNIEnv *env, jclass activity_class, jfloat delta_x, jfloat delta_y);
 typedef void (*bg2_sdl_native_commit_text_fn)(
@@ -70,6 +72,7 @@ static bg2_sdl_native_touch_fn SDLActivity_onNativeTouch;
 static bg2_sdl_native_resize_fn SDLActivity_onNativeResize;
 static bg2_sdl_native_surface_fn SDLActivity_onNativeSurfaceChanged;
 static bg2_sdl_native_mouse_fn SDLActivity_onNativeMouse;
+static bg2_sdl_native_tap_fn SDLActivity_onNativeTap;
 static bg2_sdl_native_pan_fn SDLActivity_onNativePan;
 static bg2_sdl_native_commit_text_fn SDLInputConnection_nativeCommitText;
 static bg2_sdl_send_keyboard_text_fn SDL_SendKeyboardText_internal;
@@ -161,6 +164,8 @@ static void require_sdl_input_bridges(void) {
             "Java_org_libsdl_app_SDLActivity_onNativeSurfaceChanged");
     SDLActivity_onNativeMouse = (bg2_sdl_native_mouse_fn)so_symbol(
         &so_mod, "Java_org_libsdl_app_SDLActivity_onNativeMouse");
+    SDLActivity_onNativeTap = (bg2_sdl_native_tap_fn)so_symbol(
+        &so_mod, "Java_org_libsdl_app_SDLActivity_onNativeTap");
     SDLActivity_onNativePan = (bg2_sdl_native_pan_fn)so_symbol(
         &so_mod, "Java_org_libsdl_app_SDLActivity_onNativePan");
     SDLInputConnection_nativeCommitText =
@@ -187,7 +192,7 @@ static void require_sdl_input_bridges(void) {
     if (!SDLActivity_onNativeKeyDown || !SDLActivity_onNativeKeyUp ||
         !SDLActivity_onNativeTouch || !SDLActivity_onNativeResize ||
         !SDLActivity_onNativeSurfaceChanged || !SDLActivity_onNativeMouse ||
-        !SDLActivity_onNativePan ||
+        !SDLActivity_onNativeTap || !SDLActivity_onNativePan ||
         !SDLInputConnection_nativeCommitText ||
         !SDL_SendKeyboardText_internal || !SDL_SendEditingText_internal ||
         !SDL_StartTextInput) {
@@ -389,6 +394,7 @@ void controls_handler_key(int32_t keycode, ControlsAction action) {
 }
 
 void controls_handler_touch(int32_t id, float x, float y, ControlsAction action) {
+    int send_native_tap = 0;
     /*
      * Preserve the most recent touch location as well as analog-pointer
      * location. The IME refocus sequence needs the exact box the user tapped,
@@ -431,6 +437,9 @@ void controls_handler_touch(int32_t id, float x, float y, ControlsAction action)
             bg2v_log_printf(
                 "[BG2V][TOUCH] selection gesture armed at %.0f,%.0f\n",
                 x, y);
+        }
+        if (!native_touch_moved) {
+            send_native_tap = 1;
         }
         break;
     default:
@@ -525,6 +534,22 @@ void controls_handler_touch(int32_t id, float x, float y, ControlsAction action)
     SDLActivity_onNativeTouch(
         &jni, (jclass)0x42424242, 0, id, android_action,
         x / 960.0f, y / 544.0f, 1.0f);
+
+    /*
+     * Beamdog's Android activity feeds every MotionEvent to both SDL's raw
+     * touch bridge and an Android GestureDetector. A short press therefore
+     * produces a separate onNativeTap event after the raw DOWN/UP pair.
+     * BG2 uses that custom tap event for world interactions such as choosing
+     * a spell target and activating doors, containers and characters. The
+     * Vita bridge previously supplied only the raw touch events, so menus
+     * worked while those world objects ignored otherwise valid taps.
+     */
+    if (send_native_tap) {
+        SDLActivity_onNativeTap(
+            &jni, (jclass)0x42424242, (jint)x, (jint)y);
+        bg2v_log_printf(
+            "[BG2V][TOUCH] native tap at %.0f,%.0f\n", x, y);
+    }
 }
 
 void controls_handler_analog(ControlsStickId which, float x, float y, ControlsAction action) {
@@ -568,6 +593,12 @@ void controls_handler_pointer_button(int32_t button, ControlsAction action) {
         pointer_button_state |= (unsigned int)button;
         pointer_drag_active = 0;
     }
+
+    bg2v_log_printf(
+        "[BG2V][INPUT] pointer button=%d action=%s at %.0f,%.0f\n",
+        button,
+        action == CONTROLS_ACTION_DOWN ? "down" : "up",
+        pointer_x, pointer_y);
 
     /* Position the Android mouse before changing the requested button. */
     SDLActivity_onNativeMouse(
