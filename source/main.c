@@ -85,8 +85,15 @@ static float native_touch_down_x;
 static float native_touch_down_y;
 static float native_touch_last_x;
 static float native_touch_last_y;
+static int native_selection_armed;
+static int native_touch_selection_drag;
 
-#define BG2V_TOUCH_SLOP_PIXELS 8.0f
+#define BG2V_TOUCH_SLOP_PIXELS 16.0f
+#define BG2V_TOUCH_PAN_GAIN 1.5f
+#define BG2V_TOUCH_MAX_PAN_STEP 36.0f
+#define BG2V_SELECTION_BUTTON_MIN_X 880.0f
+#define BG2V_SELECTION_BUTTON_MIN_Y 380.0f
+#define BG2V_SELECTION_BUTTON_MAX_Y 470.0f
 
 #define BG2V_NAME_FIELD_X 480.0f
 #define BG2V_NAME_FIELD_Y 215.0f
@@ -397,12 +404,16 @@ void controls_handler_touch(int32_t id, float x, float y, ControlsAction action)
         android_action = 0; /* MotionEvent.ACTION_DOWN */
         native_touch_moved = 0;
         native_touch_active_id = id;
+        native_touch_selection_drag = native_selection_armed;
+        native_selection_armed = 0;
         native_touch_down_x = x;
         native_touch_down_y = y;
         native_touch_last_x = x;
         native_touch_last_y = y;
         bg2v_log_printf(
-            "[BG2V][TOUCH] down id=%d at %.0f,%.0f\n", id, x, y);
+            "[BG2V][TOUCH] down id=%d at %.0f,%.0f mode=%s\n",
+            id, x, y,
+            native_touch_selection_drag ? "selection" : "normal");
         break;
     case CONTROLS_ACTION_UP:
         android_action = 1; /* MotionEvent.ACTION_UP */
@@ -411,6 +422,15 @@ void controls_handler_touch(int32_t id, float x, float y, ControlsAction action)
             id, x, y, native_touch_moved);
         if (native_touch_active_id == id) {
             native_touch_active_id = -1;
+        }
+        if (!native_touch_moved &&
+            x >= BG2V_SELECTION_BUTTON_MIN_X &&
+            y >= BG2V_SELECTION_BUTTON_MIN_Y &&
+            y <= BG2V_SELECTION_BUTTON_MAX_Y) {
+            native_selection_armed = 1;
+            bg2v_log_printf(
+                "[BG2V][TOUCH] selection gesture armed at %.0f,%.0f\n",
+                x, y);
         }
         break;
     default:
@@ -449,23 +469,42 @@ void controls_handler_touch(int32_t id, float x, float y, ControlsAction action)
                         id, x, y);
                     break;
                 }
+            } else if (native_touch_selection_drag) {
+                /*
+                 * The game's selection rectangle consumes an absolute extent
+                 * from the original touch point. This is intentionally used
+                 * only for the first drag after tapping the selection button;
+                 * applying it to ordinary map movement causes accumulation.
+                 */
+                delta_x = x - native_touch_down_x;
+                delta_y = y - native_touch_down_y;
             } else {
-                if (bg2v_selection_enabled) {
-                    /*
-                     * BG2's mobile selection handler adds the pan delta to
-                     * SDL's mouse position. Vita raw-touch events do not move
-                     * that internal mouse position, so use displacement from
-                     * DOWN to provide the absolute rectangle extent.
-                     */
-                    delta_x = x - native_touch_down_x;
-                    delta_y = y - native_touch_down_y;
-                } else {
-                    delta_x = x - native_touch_last_x;
-                    delta_y = y - native_touch_last_y;
-                }
+                /*
+                 * SetSelectionEnabled remains true throughout normal BG2
+                 * gameplay, not only while the selection tool is active.
+                 * Re-sending the full DOWN-to-current displacement on every
+                 * frame therefore accumulated exponentially and made short
+                 * touches fling the map.  Send only the latest finger step,
+                 * with a modest gain so deliberate selection rectangles still
+                 * track comfortably across the Vita screen.
+                 */
+                delta_x = x - native_touch_last_x;
+                delta_y = y - native_touch_last_y;
             }
 
             if (delta_x != 0.0f || delta_y != 0.0f) {
+                if (!native_touch_selection_drag) {
+                    delta_x *= BG2V_TOUCH_PAN_GAIN;
+                    delta_y *= BG2V_TOUCH_PAN_GAIN;
+                    if (delta_x > BG2V_TOUCH_MAX_PAN_STEP)
+                        delta_x = BG2V_TOUCH_MAX_PAN_STEP;
+                    if (delta_x < -BG2V_TOUCH_MAX_PAN_STEP)
+                        delta_x = -BG2V_TOUCH_MAX_PAN_STEP;
+                    if (delta_y > BG2V_TOUCH_MAX_PAN_STEP)
+                        delta_y = BG2V_TOUCH_MAX_PAN_STEP;
+                    if (delta_y < -BG2V_TOUCH_MAX_PAN_STEP)
+                        delta_y = -BG2V_TOUCH_MAX_PAN_STEP;
+                }
                 native_touch_last_x = x;
                 native_touch_last_y = y;
                 SDLActivity_onNativePan(
@@ -476,7 +515,7 @@ void controls_handler_touch(int32_t id, float x, float y, ControlsAction action)
                         "[BG2V][TOUCH] native pan id=%d delta=%.1f,%.1f "
                         "at %.0f,%.0f selection=%d\n",
                         id, delta_x, delta_y, x, y,
-                        bg2v_selection_enabled);
+                        native_touch_selection_drag);
                 }
             }
         }
