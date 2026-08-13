@@ -56,6 +56,32 @@ by this project. Please use files from your own legitimate installation.
 
 ## Troubleshooting
 
-If you encounter a problem, please open an issue in this repository with a
-description of what happened and, when possible, the `ux0:data/bg2v/bootstrap.log`
-file. 
+If you encounter a problem:
+1- please open an issue in this repository with a
+description of what happened and
+2- when possible, the `ux0:data/bg2v/bootstrap.log`
+file. Log of the latest activity.
+
+## Known "issues"
+
+In the current release of this beta version the videos rendering is still a work in progress.
+I tried several solutions / strategies. None of them satisfied me completely.
+At this stage of the beta version I deliberately left the videos with this strutted / fragmented effect.
+The best quality solution was the conversion of videos. 
+However I paused for the moment the conversion since no one would appreciate a 7GB transfer of data + 2GB of videos to transfer. 
+And not sure that modifying data is 100% correct.
+
+What does this mean?
+Videos will be slow to load (dark screen might be happening - just be patient).
+Story videos need to be tested (as I'm not far enough in the story - your help is highly appreciated!) - if slow please do not report it. (this is known and I need to decide what to do)
+Report only if crashes happens! With log please.
+
+## A small thought and AI disclaimer
+
+!AI has been used with meticulousness attention!
+Tested several (and endless) time in the gameplay and controllers.
+
+As engineer, I dedicated hours in the process (yes.. using AI) but a very meticulous process as been carried out for delivering something playable. 
+However, crashes might happen. And I highly appreciate people feedback to improve the product - my process - and Vita community that I just discovered.
+
+
