@@ -33,6 +33,14 @@ tar -C "$PROJECT_DIR" \
     --exclude=input \
     -cf - . | tar -C "$NATIVE_SOURCE" -xf -
 
+# Keep vitaGL's fast in-place updates while retaining the lifetime metadata
+# required by its inactive-texture cache. Upstream treats these build options
+# as mutually exclusive, so apply BG2V's small compatibility patch only to
+# the disposable native build copy; the pinned submodule remains untouched.
+patch --batch --forward -p1 \
+    -d "$NATIVE_SOURCE/lib/vitagl" \
+    < "$NATIVE_SOURCE/patches/vitagl-texture-cache-speedhack.patch"
+
 cmake -S "$NATIVE_SOURCE" -B "$NATIVE_BUILD" \
     -DCMAKE_BUILD_TYPE=Debug
 cmake --build "$NATIVE_BUILD" --parallel "${BG2V_BUILD_JOBS:-4}"

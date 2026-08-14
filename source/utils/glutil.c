@@ -195,13 +195,24 @@ void gl_init() {
      * helping the pre-rendered video, so keep the default framebuffer
      * single-sampled.
      */
+    /*
+     * BG2 retains textures from previously visited areas. On a longer play
+     * session those inactive pages filled VitaGL's entire 227 MiB pool and a
+     * subsequent upload failed. The VitaGL texture cache is built for this
+     * case: when an allocation needs space it moves sufficiently old,
+     * inactive textures to ux0:data/vgl_cache/BG2V00001 and transparently
+     * restores them if the game uses them again. Twenty seconds keeps recent
+     * UI/area pages resident without allowing old areas to exhaust the pool.
+     */
+    vglSetTextureCacheFrequency(600);
+
     GLboolean fallback = vglInitExtended(
         0, 960, 544, 6 * 1024 * 1024, SCE_GXM_MULTISAMPLE_NONE);
     initialized = GL_TRUE;
 
     bg2v_log_printf(
         "[BG2V][VGL] initialized%s; pool free=%u KiB total=%u KiB; "
-        "in-place texture updates enabled\n",
+        "inactive texture cache enabled (600-frame lifetime)\n",
         fallback ? " with resolution fallback" : "",
         (unsigned int)(vglMemFree(VGL_MEM_ALL) / 1024),
         (unsigned int)(vglMemTotal(VGL_MEM_ALL) / 1024));

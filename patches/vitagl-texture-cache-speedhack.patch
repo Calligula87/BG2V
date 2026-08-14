@@ -1,0 +1,84 @@
+diff --git a/source/custom_shaders.c b/source/custom_shaders.c
+--- a/source/custom_shaders.c
++++ b/source/custom_shaders.c
+@@ -706 +706 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -753 +753 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -925 +925 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -972 +972 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -1174 +1174 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -1221 +1221 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -1453 +1453 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+diff --git a/source/draw.c b/source/draw.c
+--- a/source/draw.c
++++ b/source/draw.c
+@@ -592 +592 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+diff --git a/source/ffp.c b/source/ffp.c
+--- a/source/ffp.c
++++ b/source/ffp.c
+@@ -1192 +1192 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -1325 +1325 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -1532 +1532 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -2548 +2548 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -2576 +2576 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+diff --git a/source/shared.h b/source/shared.h
+--- a/source/shared.h
++++ b/source/shared.h
+@@ -189 +189 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+diff --git a/source/textures.c b/source/textures.c
+--- a/source/textures.c
++++ b/source/textures.c
+@@ -1732 +1732 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+diff --git a/source/utils/gpu_utils.c b/source/utils/gpu_utils.c
+--- a/source/utils/gpu_utils.c
++++ b/source/utils/gpu_utils.c
+@@ -374 +374 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -435 +435 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -494 +494 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -651 +651 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -796 +796 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -901 +901 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
+@@ -1000 +1000 @@
+-#ifndef TEXTURES_SPEEDHACK
++#if !defined(TEXTURES_SPEEDHACK) || defined(HAVE_TEX_CACHE)
