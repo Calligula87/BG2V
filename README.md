@@ -10,6 +10,7 @@ controls, touchscreen support, and Vita-optimized startup videos.
 
 This project is a work in progress. Compatibility and performance may vary by
 Vita and by Android game version.
+
 Android Version: 6.6.13 is the Android Enhanced Edition version I used/tested for BG2V.
 
 ## Installation
