@@ -79,9 +79,11 @@ Report only if crashes happens! With log please.
 
 
 
-# Rapid Save Button: when executed it freezes for few second the game. Please wait 
+### Rapid Save Button: 
+when executed it freezes for few second the game. Please wait 
 
-# Menu Buttons might require a second touch before entering the window. Please let me know if struggling. I got used to.
+### Menu Buttons
+they might require a second touch before entering the window. Please let me know if struggling. I got used to.
 
 
 ## A small thought and AI disclaimer
