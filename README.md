@@ -64,7 +64,7 @@ file. Log of the latest activity.
 
 ## Known "issues"
 
-#Videos
+- Videos
 In the current release of this beta version the videos rendering is still a work in progress.
 I tried several solutions / strategies. None of them satisfied me completely.
 At this stage of the beta version I deliberately left the videos with this strutted / fragmented effect.
@@ -77,9 +77,9 @@ Videos will be slow to load (dark screen might be happening - just be patient).
 Story videos need to be tested (as I'm not far enough in the story - your help is highly appreciated!) - if slow please do not report it. (this is known and I need to decide what to do)
 Report only if crashes happens! With log please.
 
-#Others behaviour  left
-- Rapid Save Button: when executed it freezes for few second the game. Please wait 
-- Menu Buttons might require a second touch before entering the window. Please let me know if struggling. I got used to.
+-Others behaviour  left
+  - Rapid Save Button: when executed it freezes for few second the game. Please wait 
+  - Menu Buttons might require a second touch before entering the window. Please let me know if struggling. I got used to.
 
 
 ## A small thought and AI disclaimer
