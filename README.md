@@ -86,6 +86,8 @@ when executed it freezes for few second the game. Please wait
 ### Menu Buttons
 they might require a second touch before entering the window. Please let me know if struggling. I got used to.
 
+### Inventory
+I cannot find a good solution for the moment.  First selection of object is done through touch, then the stick to move and click X to release
 
 ## A small thought and AI disclaimer
 
