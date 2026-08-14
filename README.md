@@ -64,6 +64,7 @@ file. Log of the latest activity.
 
 ## Known "issues"
 
+### Videos
 
 In the current release of this beta version the videos rendering is still a work in progress.
 I tried several solutions / strategies. None of them satisfied me completely.
