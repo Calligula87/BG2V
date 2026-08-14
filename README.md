@@ -94,7 +94,7 @@ I cannot find a good solution for the moment.  First selection of object is done
 !AI has been used with meticulousness attention!
 Tested several (and endless) time in the gameplay and controllers.
 
-As engineer, I dedicated hours in the process (yes.. using AI) but a very meticulous process as been carried out for delivering something playable. 
+As engineer, I dedicated hours in the process (yes.. using AI) but a very meticulous process has been carried out for delivering something playable. 
 However, crashes might happen. And I highly appreciate people feedback to improve the product - my process - and Vita community that I just discovered.
 
 ## Screenshots
