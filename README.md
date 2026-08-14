@@ -95,4 +95,16 @@ Tested several (and endless) time in the gameplay and controllers.
 As engineer, I dedicated hours in the process (yes.. using AI) but a very meticulous process as been carried out for delivering something playable. 
 However, crashes might happen. And I highly appreciate people feedback to improve the product - my process - and Vita community that I just discovered.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/bg2v-gameplay-01.png" alt="BG2V gameplay and dialogue" width="49%">
+  <img src="docs/screenshots/bg2v-gameplay-02.png" alt="BG2V options menu" width="49%">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/bg2v-gameplay-03.png" alt="Baldur's Gate II campaign selection" width="49%">
+  <img src="docs/screenshots/bg2v-gameplay-04.png" alt="Shadows of Amn menu" width="49%">
+</p>
+
 
