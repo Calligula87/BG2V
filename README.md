@@ -25,9 +25,6 @@ Windows Setup package, and a homebrew-capable Vita with VitaShell.
 The Windows Setup uses tools already included with Windows. Python, WSL, and
 command-line knowledge are not required.
 
-If `ffmpeg.exe` is available next to the setup batch file, startup videos are
-converted automatically for Vita. Otherwise they are skipped by default to
-avoid stutter.
 
 ## Controls
 
