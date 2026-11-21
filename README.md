@@ -108,4 +108,7 @@ However, crashes might happen. And I highly appreciate people feedback to improv
   <img src="docs/screenshots/bg2v-gameplay-04.png" alt="Shadows of Amn menu" width="49%">
 </p>
 
+if you appreciate the work
+
+[![Buy Me a Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://www.buymeacoffee.com/caligolare6)
 
